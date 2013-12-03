@@ -7,15 +7,16 @@ import re
 
 env = Environment()
 
-def emptyDir(env, dir):
-    dir = env.Dir(dir)
-    print 'empty %s/' % dir.path
-    dir = dir.abspath
-    if path.exists(dir):
-        shutil.rmtree(dir)
-    os.makedirs(dir)
-
-env.AddMethod(emptyDir)
+env['BUILD_DIR'] = env.Dir('build')
+if path.exists('/dev/shm'):
+    env['WORK_DIR'] = env.Dir('/dev/shm/build')
+else:
+    env['WORK_DIR'] = env['BUILD_DIR']
+env['CLOJURE'] = env['BUILD_DIR'].File('clojure-1.5.1.jar')
+env['MANIFEST'] = {
+    'Manifest-Version': '1.0',
+    'Created-By': 'scons 2.3.0',
+}
 
 def walkDir(env, dir):
     d = dir.abspath
@@ -27,17 +28,6 @@ def walkDir(env, dir):
             yield dir.File(path.relpath(f, d))
 
 env.AddMethod(walkDir)
-
-env['BUILD_DIR'] = env.Dir('build')
-if path.exists('/dev/shm'):
-    env['WORK_DIR'] = env.Dir('/dev/shm/build')
-else:
-    env['WORK_DIR'] = env['BUILD_DIR']
-env['CLOJURE'] = env['BUILD_DIR'].File('clojure-1.5.1.jar')
-env['MANIFEST'] = {
-    'Manifest-Version': '1.0',
-    'Created-By': 'scons 2.3.0',
-}
 
 def cleanLinks():
     for rt, dirs, files in os.walk(env['BUILD_DIR'].abspath):
