@@ -94,6 +94,8 @@ def prepareBuildDir(env):
 
 prepareBuildDir(env)
 
+# global builders and helpers
+
 def parseClojurePackage(src):
     pkg = src.split(os.sep)
     pkg[-1] = path.splitext(pkg[-1])[0]
@@ -191,6 +193,17 @@ def compileAndJar(env, dstJar, srcDir, **kwargs):
     return dstJar
 
 env.AddMethod(compileAndJar)
+
+def _Glob(self, *args, **kwargs):
+    files = self.Glob_(*args, **kwargs)
+    files.sort(key=str)
+    return files
+env.__class__.Glob_ = env.__class__.Glob
+env.__class__.Glob = _Glob
+
+def subdirs(self, *dirs):
+    return self.SConscript(dirs=Flatten(dirs), exports={'env':self})
+env.AddMethod(subdirs)
 
 env.SConscriptChdir(1)
 env.SConscript('$BUILD_DIR/SConscript', exports='env')
