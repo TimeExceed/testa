@@ -42,14 +42,18 @@ Users define their tests by `testa` library and run these tests by `runtests.py`
 
 First, you should involve `suite` macro, like:
 
-    (use `[testa.core :only (suite)])
+```clojure
+(use `[testa.core :only (suite)])
+```
 
 Second, define your test suite with test cases in it, like:
 
-    (suite ":is usage: compare exprs to values"
-      (:fact is-case1 (* 6 7) :is 42)
-      (:fact is-case2 (* 6 7) :is (* 3 14))
-    )
+```clojure
+(suite ":is usage: compare exprs to values"
+  (:fact is-case1 (* 6 7) :is 42)
+  (:fact is-case2 (* 6 7) :is (* 3 14))
+)
+```
 
 where `is-case1` and `is-case2` are shorthands of names of these two test cases.
 Their whole names are `example.main.is-case1` and `example.main.is-case2` respectively.
@@ -57,11 +61,13 @@ Their whole names are `example.main.is-case1` and `example.main.is-case2` respec
 
 Last step, connect your test suites to an entry point, like:
 
-    (defn -main [& args]
-      (->>
-        (load-cases
-          'example.main)
-        (main args)))
+```clojure
+(defn -main [& args]
+  (->>
+    (load-cases
+      'example.main)
+    (main args)))
+```
 
 `load-cases` can accept a series of name spaces and search test cases in them.
 
@@ -70,27 +76,29 @@ Besides `:is`, there are also `:eq` and `:throws`.
 * `:is` accepts two lists and expects evaluating them will cause the same result.
 * `:eq` accepts two functions and expects applying same inputs to them will cause the same result.
 
-        (defn gcd [x y]
-          (if (= 0 x)
-            y
-            (recur (rem y x) x)))
-        (defn gcd-counterpart [x y]
-          (if (= 0 x)
-            y
-            (->> (range 1 (inc' x))
-              (filter #(= 0 (rem x %)))
-              (filter #(= 0 (rem y %)))
-              (apply max))))
-        (defn testbench [test]
-          (let [
-            x (rand-int 10)
-            y (rand-int 10)
-            ]
-            (test x y)))
-        (suite ":eq usage: with a testbench"
-          (:testbench testbench)
-          (:fact eq-case1 gcd :eq #(gcd-counterpart %1 %2))
-        )
+```clojure
+(defn gcd [x y]
+  (if (= 0 x)
+    y
+    (recur (rem y x) x)))
+(defn gcd-counterpart [x y]
+  (if (= 0 x)
+    y
+    (->> (range 1 (inc' x))
+      (filter #(= 0 (rem x %)))
+      (filter #(= 0 (rem y %)))
+      (apply max))))
+(defn testbench [test]
+  (let [
+    x (rand-int 10)
+    y (rand-int 10)
+    ]
+    (test x y)))
+(suite ":eq usage: with a testbench"
+  (:testbench testbench)
+  (:fact eq-case1 gcd :eq #(gcd-counterpart %1 %2))
+)
+```
 
   In this example, `:testbench` generates two integer numbers between 0 and 10.
   `:eq` takes these two numbers and applies them to both `gcd` and `gcd-counterpart`(to be precisely, the anonymous function `#(gcd-counterpart %1 %2)`).
@@ -101,9 +109,11 @@ Besides `:is`, there are also `:eq` and `:throws`.
 * `:throws` accepts a function on its left hand and an exception on its right hand.
   While evaluating the left-hand function, the right-hand exception is expected to be thrown.
 
-      (suite ":throw usage: with exception"
-        (:fact throw-case1 (fn [] (/ 1 0)) :throws ArithmeticException)
-      )
+```clojure
+(suite ":throw usage: with exception"
+  (:fact throw-case1 (fn [] (/ 1 0)) :throws ArithmeticException)
+)
+```
 
 A few more words on `:testbench`.
 
@@ -122,8 +132,118 @@ All examples above and more can be found in example/main.clj.
 
 ### In Lua
 
-Testa for Lua is conceptually is same as that for Clojure.
+Testa for Lua is conceptually similar as that for Clojure.
 Please see lua/testa_test.lua for examples.
+So far testa is tested under lua-5.3.
+But we believe it also works well under lua-5.2.
+
+Testa for lua provides 3 functions: `is`, `eq` and `verify`.
+There is no counterpart of `:throw` in clojure.
+It is unwise to raise exceptions in lua.
+
+* `is` takes 3 arguments: a function without arguments `casefunc`, a result `expect` and an optional testbench function `tb`.
+
+  The testbench function prepares the environment for running the case.
+  It takes a 0-ary function `case` as its single argument.
+  When `case` is invoked, it runs `casefunc` and compares its result with `expect`.
+
+```lua
+testTesta.correctAddition = testa.is(
+    function ()
+        return 1 + 2
+    end,
+    3
+)
+```
+
+* `eq` takes also 3 arguments: a function to test `casefunc`, a function `oracle`, and an optional testbench function `tb`.
+  `casefunc` and `oracle` must be able to be applied by same arguments.
+
+  `tb` takes a function `case`.
+  It prepares environment, generates one or more stimulus and applies this/these stimulus on `case`.
+  When `case` is invoked, it applies stimulus on both `casefunc` and `oracle` and compares their results.
+
+```lua
+testTesta.correctMultiple = testa.eq(
+    function (x, y)
+        return x * y
+    end,
+    function (x, y)
+        local r = 0
+        for i = 1, y do 
+            r = r + x
+        end
+        return r
+    end,
+    function (case)
+        for i = 1, 5 do
+            for j = 1, 5 do
+                local ok, msg = case(i, j)
+                if not ok then
+                    return false, msg
+                end
+            end
+        end
+        return true
+    end
+)
+```
+
+* `verify` takes also 3 arguments: a function to test `casefunc`, a function `oracle` and an optional testbench function `tb`.
+
+  `tb` takes a function `case`.
+  It prepares environment, generates one or more stimulus and applies this/these stimulus on `case`.
+  When `case` is invoked, it applies stimulus on `casefunc`, and then invokes `oracle` by both the result of `casefunc` and the stimulus to see whether the result is okey.
+
+  `verify` is quite suitable for those cases which verifying them is easier than computing them.
+
+```lua
+local function gcd(a, b)
+    if a == 0 and b == 0 then
+        error("undefined on (0,0)")
+    end
+    if a == 0 then
+        return b
+    else
+        return gcd(b % a, a)
+    end
+end
+
+local function gcdtb(case)
+    for i = 0, 12 do
+        for j = 0, 12 do
+            if i ~= 0 or j ~= 0 then
+                local ok, msg = case(i, j)
+                if not ok then
+                    return false, msg
+                end
+            end
+        end
+    end
+    return true
+end
+
+testTesta.correctGcd = testa.verify(
+    gcd,
+    function (result, i, j)
+        if i % result == 0 and j % result == 0 then
+            return true
+        else
+            return false, string.format('%d~=gcd(%d,%d)', result, i, j)
+        end
+    end,
+    gcdtb
+)
+```
+
+It is easy to see `is`, `eq` and `verify` can accept a same testbench.
+One can leverage it to reduce test code.
+
+Testa also provides a main function as an entry point.
+
+```lua
+testa.main({TestTesta = testTesta})
+```
 
 ## How to run tests
 
@@ -242,10 +362,13 @@ Only test cases related to `:is` are executed.
 ## How to build?
 
 Please make sure the following requisitions are ready.
-* jdk6+. Testa is developed under jdk7, but we think jdk6 is ok too.
 * python2.6+. necessary to run scons and runtests.py
 * scons 2.1+.
-* wget
-* network connection for first build
+* for clojure:
+  - (optional) jdk6+. Testa is developed under jdk7, but we think jdk6 is ok too.
+  - wget
+  - network connection for first build
+* for lua:
+  - lua-5.3. Testa is developed under lua-5.3, but we think lua-5.2 is ok too.
 
 Then, under the root directory of testa, run `scons`, and all jar-files will be placed under `build/` directory.
