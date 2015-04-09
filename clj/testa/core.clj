@@ -257,7 +257,14 @@
 
 (defn- silently-run [cases to-run]
     (doseq [cs to-run]
-        ((cases cs))
+        (try
+            ((cases cs))
+        (catch Throwable ex
+            (with-open [wrt (PrintWriter. *out*)]
+                (.printStackTrace ex wrt)
+            )
+            (System/exit 1)
+        ))
     )
 )
 
