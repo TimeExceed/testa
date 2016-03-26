@@ -1,299 +1,202 @@
-#!/bin/env python2.6
-# -*- coding: UTF-8 -*-
-import optparse
+#!/usr/bin/env python3
+
+# Copyright (c) 2013, TimeExceed
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice, this
+#   list of conditions and the following disclaimer in the documentation and/or
+#   other materials provided with the distribution.
+#
+# * Neither the name of the {organization} nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 import sys
 import os
 import os.path as op
-from Queue import Queue
+from queue import Queue
 import threading
 import json
 import subprocess as subprocess
-import traceback
+import shlex
 import re
-import termcolor
 from functools import partial
 from itertools import groupby
-from datetime import datetime, timedelta
-from time import sleep
-
-LUA = ['lua']
-JAVA = ['java', '-jar']
-VALGRIND = 'valgrind'
+from datetime import datetime
+import argparse
+import termcolor
 
 def countCpu():
-    '''
-    Returns the number of CPUs in the system
-    Works only under *nix.
-    '''
     try:
         num = os.sysconf('SC_NPROCESSORS_ONLN')
         return num
     except (ValueError, OSError, AttributeError):
         raise NotImplementedError('cannot determine number of cpus')
 
-def parseArgs(args):
-    parser = optparse.OptionParser("usage: %%prog [options] unittest-binary ...")
-    parser.add_option('-j', '--jobs', action='store', type='int', dest='jobs',
-        help='how many test cases can run parallelly [default: as many as CPU cores]')
-    parser.add_option('-d', '--dir', action='store', type='string', dest='dir',
-        default='test_results',
-        help='the directory where results of test cases are put [default: test_results]')
-    parser.add_option('-i', '--include', action='store',type='string',
-        dest='include',
-        help='A regular expression. It will be run for only test cases \
-containing this pattern. [default: all]')
-    parser.add_option('-e', '--exclude', action='store',type='string',
-        dest='exclude',
-        help='A regular expression. It will not be run for all \
-test cases containing this pattern. [default: none]')
-    parser.add_option('--time-limit', action='store',type='int',
-        dest='timeout',
-        help='how long a case is allowed to run (in msec) [default: disable]')
-    parser.add_option('--valgrind', action='store', type='string', dest='valgrind',
-        help='run test cases by valgrind with valgrind options as json array, \
-e.g., --valgrind=["--error-exitcode=1"] [default: disable]')
-    opts, executables = parser.parse_args(args)
+def parseArgs():
+    parser = argparse.ArgumentParser(description='Run some test cases, which obey testa protocol')
+    parser.add_argument('executables', metavar='program', type=str, nargs='+',
+                        help='executables obey testa protocol')
+    parser.add_argument('-l', '--lang', nargs='?', default='lang.config',
+                        help='a file specifying how to run executable for different programming languages. [default: lang.config]')
+    parser.add_argument('-d', '--dir', nargs='?', default='test_results',
+                        help='the directory where results of test cases are put [default: test_results]')
+    parser.add_argument('-j', '--jobs', nargs='?', type=int, default=countCpu(),
+                        help='how many test cases can run parallelly [default: as many as CPU cores]')
+    parser.add_argument('-i', '--include', nargs='?', default='.*',
+                        help='A regular expression. Only test cases matching this pattern will be run. [default: ".*"]')
+    parser.add_argument('-e', '--exclude', nargs='?', default='^$',
+                        help='A regular expression. Test cases matching this pattern will not be run. [default: "^$"]')
+    parser.add_argument('--timeout', nargs='?',
+                        help='how long a case is allowed to run (in msec) [default: disable]')
+    parser.add_argument('--report', nargs='?',
+                        help='report as a json file')
+    args = parser.parse_args()
+    return args
 
-    if not opts.jobs:
-        opts.jobs = countCpu()
-    return opts, executables[1:]
+def readLangCfg(fn):
+    with open(fn) as f:
+        cfg = json.load(f)
+    if type(cfg) != list:
+        raise Exception('language config must be a list')
+    for lang in cfg:
+        if type(lang) != dict:
+            raise Exception('each language in language config must be a dict')
+        if 'language' not in lang:
+            raise Exception('need "language" item for name of language')
+        if 'pattern' not in lang:
+            raise Exception('"pattern" is necessary for "%s", which must be a regular expression to match filenames' % lang["language"])
+        if 'execute' not in lang:
+            raise Exception('"execute" is necessary for "%s", which must a list of args' % lang["language"])
+        if '%(prog)s' not in lang['execute']:
+            raise Exception('"%(prog)s" is necessary for "execute" in "%s", which stands for executables' % lang["language"])
+        if '%(arg)s' not in lang['execute']:
+            raise Exception('"%(arg)s" is necessary for "execute" in "%s", which stands for the arg of testa protocol' % lang["language"])
+    return cfg
 
+kOk = 'OK'
+kError = 'Error'
+kTimeout = 'Timeout'
+kCancel = 'Cancel'
 
-class ExceptInThread(Exception):
-    def __init__(self, tid, exc, tb):
-        self.tid = tid
-        self.exc = exc
-        self.tb = tb
+gCancelled = False
 
-    def show(self):
-        print>>sys.stderr, 'An exception occurs in thread %d: %s' % (
-            self.tid, str(self.exc))
-        traceback.print_tb(self.tb)
+def work(opts, qin, qout):
+    global gCancelled
+    try:
+        while True:
+            cs = qin.get()
+            if cs == None:
+                break
+            if gCancelled:
+                break
+            args = shlex.split(cs['execute'])
+            kws = {}
+            with open(cs['stdout'], 'wb') as stdout, open(cs['stderr'], 'wb') as stderr:
+                kws['stdout'] = stdout
+                kws['stderr'] = stderr
+                kws['check'] = True
+                kws['cwd'] = cs['cwd']
+                if opts.timeout:
+                    kws['timeout'] = opts.timeout / 1000
+                cs['start'] = datetime.utcnow()
+                try:
+                    subprocess.run(args, **kws)
+                    cs['stop'] = datetime.utcnow()
+                    qout.put([kOk, cs['name'], cs])
+                except subprocess.CalledProcessError:
+                    cs['stop'] = datetime.utcnow()
+                    qout.put([kError, cs['name'], cs])
+                except subprocess.TimeoutExpired:
+                    cs['stop'] = datetime.utcnow()
+                    qout.put([kTimeout, cs['name'], cs])
+    except KeyboardInterrupt:
+        qout.put([kCancel, 'Ctrl-C'])
+    except Exception as ex:
+        qout.put([kCancel, str(ex)])
 
-def threadLoop(tid, qin, qout):
-    while True:
-        task = qin.get(True)
-        if task is None:
-            return
-        try:
-            res = task()
-            qout.put(res)
-        except Exception, ex:
-            qout.put(ExceptInThread(tid, ex, sys.exc_info()[2]))
+def launchWorkers(opts):
+    reqQ = Queue()
+    resQ = Queue()
+    workers = [threading.Thread(target=work, args=(opts, reqQ, resQ)) for _ in range(opts.jobs)]
+    for w in workers:
+        w.start()
+    return reqQ, resQ, workers
 
-class ThreadPool(object):
-    def __init__(self, jobs, qin, qout, func):
-        self.threads = []
-        for i in range(jobs):
-            x = threading.Thread(target=func, args=(i, qin, qout))
-            x.setDaemon(False)
-            x.start()
-            self.threads.append(x)
-        self.qin = qin
+def stopWorkers(reqQ, workers):
+    for _ in range(len(workers)):
+        reqQ.put(None)
+    for w in workers:
+        w.join()
 
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        for _ in self.threads:
-            self.qin.put(None)
-        for t in self.threads:
-            t.join()
+def error(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
 
+def findMatchLanguage(exe, langs):
+    for lang in langs:
+        if re.match(lang['pattern'], exe):
+            return lang
+    return None
 
-def classifyLua(lua):
-    if lua.endswith('_unittest.lua'):
-        return 'unit test'
-    elif lua.endswith('_smoketest.lua'):
-        return 'smoke test'
-    else:
-        return 'functional test'
+def getExecutableArgs(exe, langs):
+    lang = findMatchLanguage(exe, langs)
+    if not lang:
+        error("I don't know how to execute " + exe)
+    return lang['execute'] % {'prog': exe, 'arg': '--show-cases'}
 
-def fetchUTs_lua(lua, opts):
-    baseDir = opts.dir
-    executable = op.basename(lua)
-    tmpout = op.join(baseDir, '%s.out' % executable)
-    tmperr = op.join(baseDir, '%s.err' % executable)
-    cmd = LUA + [op.abspath(lua), '--show-cases']
-    with open(tmpout, 'wb') as cout:
-        with open(tmperr, 'wb') as cerr:
-            subprocess.check_call(cmd, stdout=cout, stderr=cerr, cwd=op.dirname(lua))
-    with open(tmpout) as f:
-        res = [x.strip() for x in f]
-    res = [x for x in res if x]
-    res = [{
-        'executable': executable, 
-        'cmd': LUA + [op.abspath(lua), x],
-        'cwd': op.abspath(op.dirname(lua)),
-        'outfn': genOutFn(executable, x, baseDir),
-        'errfn': genErrFn(executable, x, baseDir),
-        'corefn': genCoreFn(executable, x, baseDir),
-        'casename': x,
-        'class': classifyLua(lua),
-    } for x in res]
-    return res
-
-def classifyJava(jar):
-    if jar.endswith('_puretest.jar'):
-        return 'pure test'
-    elif jar.endswith('_unittest.jar'):
-        return 'unit test'
-    elif jar.endswith('_smoketest.jar'):
-        return 'smoke test'
-    else:
-        return 'functional test'
-
-def fetchUTs_java(jar, opts):
-    baseDir = opts.dir
-    executable = op.basename(jar)
-    tmpout = op.join(baseDir, '%s.out' % executable)
-    tmperr = op.join(baseDir, '%s.err' % executable)
-    cmd = JAVA + [op.abspath(jar), '--show-cases']
-    with open(tmpout, 'wb') as cout:
-        with open(tmperr, 'wb') as cerr:
-            subprocess.check_call(cmd, stdout=cout, stderr=cerr, cwd=op.dirname(jar))
-    with open(tmpout) as f:
-        res = [x.strip() for x in f]
-    res = [x for x in res if x]
-    res = [{
-        'executable': executable,
-        'cmd': JAVA + [op.abspath(jar), x],
-        'cwd': op.abspath(op.dirname(jar)),
-        'outfn': genOutFn(executable, x, baseDir),
-        'errfn': genErrFn(executable, x, baseDir),
-        'corefn': genCoreFn(executable, x, baseDir),
-        'casename': x,
-        'class': classifyJava(jar),
-    } for x in res]
-    return res
-
-def classifyRaw(exe):
-    if exe.endswith('_puretest'):
-        return 'pure test'
-    elif exe.endswith('_unittest'):
-        return 'unit test'
-    elif exe.endswith('_smoketest'):
-        return 'smoke test'
-    else:
-        return 'functional test'
-
-def fetchUTs_raw(exe, opts):
-    baseDir = opts.dir
-    executable = op.basename(exe)
-    tmpout = op.join(baseDir, '%s.out' % executable)
-    tmperr = op.join(baseDir, '%s.err' % executable)
-    cmd = JAVA + [op.abspath(exe), '--show-cases']
-    with open(tmpout, 'wb') as cout:
-        with open(tmperr, 'wb') as cerr:
-            subprocess.check_call(cmd, stdout=cout, stderr=cerr, cwd=op.dirname(exe))
-    with open(tmpout) as f:
-        res = [x.strip() for x in f]
-    res = [x for x in res if x]
-    res = [{
-        'executable': executable,
-        'cmd': [op.abspath(exe), x],
-        'cwd': op.abspath(op.dirname(exe)),
-        'outfn': genOutFn(executable, x, baseDir),
-        'errfn': genErrFn(executable, x, baseDir),
-        'corefn': genCoreFn(executable, x, baseDir),
-        'casename': x,
-        'class': classifyRaw(exe),
-    } for x in res]
-    return res
-
-def fetchUTs_comb(qin, qout, exes, opts):
+def collectCases(opts, langs, reqQ, resQ):
+    exes = []
+    for exe in opts.executables:
+        progDir = op.dirname(exe)
+        exe = op.basename(exe)
+        exeArgs = getExecutableArgs(exe, langs)
+        testDir = op.abspath(op.join(opts.dir, exe))
+        if not op.exists(testDir):
+            os.makedirs(testDir)
+        exes.append({
+            'name': exe,
+            'execute': exeArgs,
+            'cwd': progDir,
+            'stdout': op.join(testDir, 'cases.out'),
+            'stderr': op.join(testDir, 'cases.err')})
     for e in exes:
-        if e.endswith('.jar'):
-            qin.put(partial(fetchUTs_java, e, opts))
-        elif e.endswith('.lua'):
-            qin.put(partial(fetchUTs_lua, e, opts))
-        else:
-            qin.put(partial(fetchUTs_raw, e, opts))
-    r = []
-    for _ in exes:
-        x = qout.get()
-        if isinstance(x, ExceptInThread):
-            x.show()
-            sys.exit(1)
-        assert isinstance(x, list)
-        r += x
-    return r
+        reqQ.put(e)
 
-def include(cases, opts):
-    if not opts.include:
-        return cases
-    pat = re.compile(opts.include)
-    return [x for x in cases if pat.search(x['casename'])]
-
-def exclude(cases, opts):
-    if not opts.exclude:
-        return cases
-    pat = re.compile(opts.exclude)
-    return [x for x in cases if not pat.search(x['casename'])]
-
-def genOutFn(exe, case, base):
-    return op.join(op.abspath(base), '%s.%s.out' % (op.basename(exe), case))
-
-def genErrFn(exe, case, base):
-    return op.join(op.abspath(base), '%s.%s.err' % (op.basename(exe), case))
-
-def genCoreFn(exe, case, base):
-    return op.join(op.abspath(base), '%s.%s.core' % (op.basename(exe), case))
-
-def myResult(exitcode, case):
-    if exitcode is None:
-        return 'TIMEOUT'
-    elif exitcode == 0:
-        return 'PASS'
-    else:
-        return 'FAIL'
-
-def runSingleCase(case, opts):
-    base = opts.dir
-    exe = case['executable']
-    casename = case['casename']
-    cwd = case['cwd']
-    outfn = case['outfn']
-    errfn = case['errfn']
-    corefn = case['corefn']
-    cmd = case['cmd']
-    if opts.valgrind:
-        valgrindOpts = json.loads(opts.valgrind)
-        cmd = [VALGRIND, '--error-exitcode=1'] + valgrindOpts + cmd
-    with open(outfn, 'wb') as cout:
-        with open(errfn, 'wb') as cerr:
-            p = subprocess.Popen(cmd, stdout=cout, stderr=cerr, cwd=cwd)
-            if not opts.timeout:
-                exitcode = p.wait()
-            else:
-                duration = timedelta(milliseconds=opts.timeout)
-                start = datetime.utcnow()
-                while True:
-                    exitcode = p.poll()
-                    if exitcode is not None:
-                        break
-                    if datetime.utcnow() - start > duration:
-                        break
-                    sleep(0.1)
-                if exitcode is None:
-                    subprocess.call(['gcore', '-o', corefn, '%d' % p.pid], 
-                        stdout=cout, stderr=cerr)
-                    subprocess.call(['kill', '-9', '%d' % p.pid],
-                        stdout=cout, stderr=cerr)
-    res = case.copy()
-    res['result'] = myResult(exitcode, case)
-    return res
-
-def dispatchCases(cases, opts, qin):
-    ptut = [k for k in cases if k['class'] in ['pure test', 'unit test']]
-    for case in ptut:
-        qin.put(partial(runSingleCase, case, opts))
-    for i in range(opts.jobs - 1):
-        qin.put(None) # shutdown all workers except one
-    stft = [k for k in cases if k['class'] in ['smoke test', 'functional test']]
-    for case in stft:
-        qin.put(partial(runSingleCase, case, opts))
-    qin.put(None) # shutdown the last worker
+    cases = []
+    for _ in range(len(exes)):
+        res = resQ.get()
+        assert res[0] == kOk, res
+        exe = res[1]
+        with open(op.join(opts.dir, exe, 'cases.out')) as f:
+            cs = [x.strip() for x in f]
+        cs = [x for x in cs if x]
+        lang = findMatchLanguage(exe, langs)
+        for c in cs:
+            cases.append({
+                'name': '%s.%s' % (exe, c),
+                'execute': lang['execute'] % {'prog': exe, 'arg': c},
+                'cwd': res[2]['cwd'],
+                'stdout': op.join(opts.dir, exe, '%s.out' % c),
+                'stderr': op.join(opts.dir, exe, '%s.err' % c)})
+    return cases
 
 def colored(s, color):
     if not os.isatty(sys.stdout.fileno()):
@@ -301,98 +204,47 @@ def colored(s, color):
     else:
         return termcolor.colored(s, color)
 
-def collectResults(cases, opts, qout):
+def filterCases(opts, cases):
+    cases = [x for x in cases if not re.search(opts.exclude, x['name'])]
+    cases = [x for x in cases if re.search(opts.include, x['name'])]
+    return cases
+
+def dispatchCases(cases, reqQ):
+    for cs in cases:
+        reqQ.put(cs)
+
+def collectResults(opts, cases, resQ):
     passed = []
     failed = []
     caseNum = len(cases)
     while len(passed) + len(failed) < caseNum:
-        x = qout.get()
-        if isinstance(x, ExceptInThread):
-            x.show()
-            sys.exit(1)
-        case = x
-        if case['result'] == 'PASS':
-            passed.append(case)
+        res = resQ.get()
+        if res[0] == kOk:
+            passed.append(res[2])
             result = colored('pass', 'green')
-        elif case['result'] == 'FAIL':
-            failed.append(case)
+        elif res[0] == kError:
+            failed.append(res[2])
             result = colored('fail', 'red')
-        elif case['result'] == 'KILL':
-            failed.append(case)
+        elif res[0] == kTimeout:
+            failed.append(res[2])
             result = colored('kill', 'red')
         else:
-            assert false
-        print '%d/%d %s: %s in %s' % (
-            len(passed) + len(failed), caseNum, result, case['casename'], 
-            case['executable'])
+            error('cancelled')
+        print('%d/%d %s: %s' % (
+            len(passed) + len(failed), caseNum,
+            result,
+            res[1]))
     return passed, failed
 
-def compareCase(a, b):
-    if a['executable'] < b['executable']:
-        return -1
-    elif a['executable'] > b['executable']:
-        return 1
-    else:
-        if a['casename'] < b['casename']:
-            return -1
-        elif a['casename'] > b['casename']:
-            return 1
-        else:
-            return 0
-
-def formReport(cases):
-    cases = sorted(cases, cmp=compareCase)
-    return {'cases': cases}
-
-def iso8601(dt):
-    s = dt.isoformat()
-    if dt.utcoffset():
-        return s
-    else:
-        return s + 'Z'
-
-def main(exes, opts):
-    assert isinstance(exes, list)
-    assert exes
-    assert opts.jobs
-    assert opts.jobs > 0
-    assert opts.dir
-    if not op.exists(opts.dir):
-        os.mkdir(opts.dir)
-    assert op.isdir(opts.dir)
-    assert not opts.timeout or opts.timeout > 0
-
-    start = datetime.utcnow()
-    qin = Queue()
-    qout = Queue()
-    with ThreadPool(opts.jobs, qin, qout, threadLoop):
-        cases = fetchUTs_comb(qin, qout, exes, opts)
-        cases = include(cases, opts)
-        cases = exclude(cases, opts)
-        dispatchCases(cases, opts, qin)
-        passed, failed = collectResults(cases, opts, qout)
-    end = datetime.utcnow()
-    print '\n%d/%d failed, costs %s secs' % (len(failed), len(passed) + len(failed), 
-        end - start)
-    failed.sort(cmp=compareCase)
-
-    if failed:
-        for case in failed:
-            print
-            print '%s in %s' % (case['casename'], case['executable'])
-            with open(genOutFn(case['executable'], case['casename'], opts.dir)) as fin:
-                c = fin.read()
-            print c
-
-    report = formReport(passed + failed)
-    report['startTimestamp'] = iso8601(start)
-    report['endTimestamp'] = iso8601(end)
-    with open(op.join(opts.dir, 'report.json'), 'w') as fout:
-        json.dump(report, fout, indent=2)
-
-    return 1 if failed else 0
-
 if __name__ == '__main__':
-    opts, exes = parseArgs(sys.argv)
-    exitcode = main(exes, opts)
-    sys.exit(exitcode)
+    opts = parseArgs()
+    langs = readLangCfg(opts.lang)
+
+    reqQ, resQ, workers = launchWorkers(opts)
+    try:
+        cases = collectCases(opts, langs, reqQ, resQ)
+        cases = filterCases(opts, cases)
+        dispatchCases(cases, reqQ)
+        collectResults(opts, cases, resQ)
+    finally:
+        stopWorkers(reqQ, workers)
