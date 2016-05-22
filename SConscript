@@ -1,3 +1,3 @@
 Import('env')
 
-env.subdirs(['clj', 'lua'])
+env.subdirs(['clj', 'lua', 'rust'])

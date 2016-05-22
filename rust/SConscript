@@ -1,0 +1,6 @@
+# -*- python -*-
+Import('env')
+
+lib = env.Command('libtesta.rlib', 'testa.rs', 'rustc --crate-type=lib -o $TARGET $SOURCE')
+exe = env.Command('rust_unittest', 'rust_unittest.rs', 'rustc -L build/rust -o $TARGET $SOURCE')
+env.Depends(exe, lib)

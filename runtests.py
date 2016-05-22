@@ -154,13 +154,14 @@ def findMatchLanguage(exe, langs):
     for lang in langs:
         if re.match(lang['pattern'], exe):
             return lang
-    return None
+    return {'language': None, 'execute': './' + exe + ' %(arg)s'}
 
 def getExecutableArgs(exe, langs):
     lang = findMatchLanguage(exe, langs)
     if not lang:
-        error("I don't know how to execute " + exe)
-    return lang['execute'] % {'prog': exe, 'arg': '--show-cases'}
+        return './%s --show-cases' % exe
+    else:
+        return lang['execute'] % {'prog': exe, 'arg': '--show-cases'}
 
 def collectCases(opts, langs, reqQ, resQ):
     exes = []

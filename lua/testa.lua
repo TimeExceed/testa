@@ -52,7 +52,7 @@ end
 
 
 local function printHelp()
-    print(string.format('%s [--help|-h] [--list] [CASENAME]', arg[0]))
+    print(string.format('%s [--help|-h] [--show-cases] [CASENAME]', arg[0]))
     print('CASENAME', 'a case name that will be executed')
     print('--show-cases', 'a list of case names, one name per line')
     print('--help,-h', 'this help message')
@@ -104,16 +104,6 @@ local function main(tbl)
         print(string.format('unknown args: %s', table.concat(arg, ' ')))
         os.exit(1)
     end
-    -- for suite, cases in pairs(tbl) do
-    --     for name, func in pairs(cases) do
-    --         local ok, msg = func()
-    --         if ok then
-    --             print(string.format('%s.%s passed', suite, name))
-    --         else
-    --             print(string.format('%s.%s failed: %s', suite, name, msg))
-    --         end
-    --     end
-    -- end
 end
 
 return {
