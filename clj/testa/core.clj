@@ -30,7 +30,6 @@
 (ns testa.core
     (:require
         [clojure.string :as str]
-        [clojure.java.io :as io]
     )
     (:import
         [java.io PrintWriter]
@@ -39,18 +38,14 @@
 
 (defmacro ^:private throw-if [pred except & args]
     `(when ~pred
-        (throw (~except ~@args))
-    )
-)
+        (throw (~except ~@args))))
 
 (defmacro ^:private throw-if-not [pred except & args]
-    `(throw-if (not ~pred) ~except ~@args)
-)
-
+    `(throw-if (not ~pred) ~except ~@args))
 
 (defn- test-is [expr actual expect]
     (let [expect (expect)
-            actual (actual)
+          actual (actual)
         ]
         (throw-if-not (= expect actual)
             AssertionError.
@@ -132,6 +127,12 @@
                 e
             ))
         )
+    )
+)
+
+(defn- test-verify [actual verify & args]
+    (let [actual (apply actual args)]
+        (apply verify actual args)
     )
 )
 
@@ -217,6 +218,25 @@
                         )
                     )
                 )
+            :verify
+                (do
+                    (throw-if-not (fn? (eval expr))
+                        IllegalArgumentException.
+                        ":verify requires fn before it"
+                    )
+                    (throw-if-not (fn? (eval expect))
+                        IllegalArgumentException.
+                        ":verify requires fn after it"
+                    )
+                    `(def ~(symbol (format "--testcase-%s" (str cs)))
+                        (#'partial ~testbench
+                            (#'partial #'test-verify
+                                ~(eval expr)
+                                ~(eval expect)
+                            )
+                        )
+                    )
+                )
         )
     )
 )
@@ -237,7 +257,7 @@
         (throw-if-not (= :fact fact)
             IllegalArgumentException. "require :fact under \"suite\""
         )
-        (throw-if-not (some #(= rel %) [:is :eq :throws])
+        (throw-if-not (some #(= rel %) [:is :eq :throws :verify])
             IllegalArgumentException.
             "require :is, :eq or :throws between exprs in \"fact\""
         )
@@ -297,44 +317,8 @@
     )
 )
 
-(defn- run [cs]
-    (try
-        (cs)
-        (println)
-        (println "RESPONSE: PASS")
-    (catch AssertionError ex
-        (let [wrt (PrintWriter. *out*)]
-            (.printStackTrace ex wrt)
-        )
-        (println)
-        (println "RESPONSE: FAIL")
-    )
-    (catch Throwable ex
-        (with-open [wrt (PrintWriter. *out*)]
-            (.printStackTrace ex wrt)
-        )
-        (System/exit 1)
-    ))
-)
-
-(defn- interactively-run' [cases in]
-    (when-let [csname (.readLine in)]
-        (let [cs (cases csname)]
-            (run cs)
-            (recur cases in)
-        )
-    )
-)
-
-(defn- interactively-run [cases]
-    (let [in (io/reader *in*)]
-        (interactively-run' cases in)
-    )
-)
-
 (defn main [args cases]
     (cond
-        (empty? args) (interactively-run cases)
         (= args ["--show-cases"]) (do
             (->> (for [[cs-name _] cases] cs-name)
                 (sort)

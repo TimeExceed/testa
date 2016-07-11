@@ -86,8 +86,6 @@ def readLangCfg(fn):
             raise Exception('"pattern" is necessary for "%s", which must be a regular expression to match filenames' % lang["language"])
         if 'execute' not in lang:
             raise Exception('"execute" is necessary for "%s", which must a list of args' % lang["language"])
-        if '%(prog)s' not in lang['execute']:
-            raise Exception('"%(prog)s" is necessary for "execute" in "%s", which stands for executables' % lang["language"])
         if '%(arg)s' not in lang['execute']:
             raise Exception('"%(arg)s" is necessary for "execute" in "%s", which stands for the arg of testa protocol' % lang["language"])
     return cfg
@@ -148,7 +146,6 @@ def stopWorkers(reqQ, workers):
         w.join()
 
 def error(msg):
-    print(msg, file=sys.stderr)
     sys.exit(1)
 
 def findMatchLanguage(exe, langs):
@@ -167,9 +164,8 @@ def getExecutableArgs(exe, langs):
 def collectCases(opts, langs, reqQ, resQ):
     exes = []
     for exe in opts.executables:
-        progDir = op.dirname(exe)
-        exe = op.basename(exe)
         exeArgs = getExecutableArgs(exe, langs)
+        progDir = op.dirname(exe)
         testDir = op.abspath(op.join(opts.dir, exe))
         if not op.exists(testDir):
             os.makedirs(testDir)
@@ -187,13 +183,13 @@ def collectCases(opts, langs, reqQ, resQ):
         res = resQ.get()
         assert res[0] == kOk, res
         exe = res[1]
-        with open(op.join(opts.dir, exe, 'cases.out')) as f:
+        with open(res[2]['stdout']) as f:
             cs = [x.strip() for x in f]
         cs = [x for x in cs if x]
         lang = findMatchLanguage(exe, langs)
         for c in cs:
             cases.append({
-                'name': '%s.%s' % (exe, c),
+                'name': '%s/%s' % (exe, c),
                 'execute': lang['execute'] % {'prog': exe, 'arg': c},
                 'cwd': res[2]['cwd'],
                 'stdout': op.join(opts.dir, exe, '%s.out' % c),
