@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2013, TimeExceed
+# This file is picked from project testa [https://github.com/TimeExceed/testa.git]
+# Copyright (c) 2013, Taoda (tyf00@aliyun.com)
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
