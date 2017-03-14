@@ -195,6 +195,15 @@ def compileAndJar(env, dstJar, srcDir, **kwargs):
 
 env.AddMethod(compileAndJar)
 
+flags = {
+    'CFLAGS': [], 
+    'CXXFLAGS': [], #'--std=c++11'
+    'CCFLAGS': ['-Wall', '-Wfloat-equal',
+                '-O0', '--coverage', '-fsanitize=address', '-fvar-tracking-assignments',
+                '-g', '-gdwarf-4'],
+    'LINKFLAGS': ['--coverage', '-fsanitize=address']}
+env.MergeFlags(flags)
+
 def _Glob(self, *args, **kwargs):
     files = self.Glob_(*args, **kwargs)
     files.sort(key=str)

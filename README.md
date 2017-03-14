@@ -1,6 +1,6 @@
-# testa
+# Testa
 
-Testa is another testing framework for clojure and lua.
+Testa is another testing framework for clojure, lua, c++ and etc.
 
 ## Why another testing framework?
 
@@ -362,7 +362,7 @@ Only test cases related to `:is` are executed.
 ## How to build?
 
 Please make sure the following requisitions are ready.
-* python2.6+. necessary to run scons and runtests.py
+* python2.7. necessary to run scons and runtests.py
 * scons 2.1+.
 * for clojure:
   - (optional) jdk6+. Testa is developed under jdk7, but we think jdk6 is ok too.
@@ -370,5 +370,7 @@ Please make sure the following requisitions are ready.
   - network connection for first build
 * for lua:
   - lua-5.3. Testa is developed under lua-5.3, but we think lua-5.2 is ok too.
+* for C++:
+  - Both C++98-TR1 (a.k.a. C++03) and C++11 are supported.
 
 Then, under the root directory of testa, run `scons`, and all jar-files will be placed under `build/` directory.

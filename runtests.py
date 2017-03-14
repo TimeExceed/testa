@@ -121,6 +121,10 @@ def work(opts, qin, qout):
                     cs['stop'] = datetime.utcnow()
                     qout.put([kOk, cs['name'], cs])
                 except subprocess.CalledProcessError:
+                    stderr.write(bytes(str(args), 'UTF-8'))
+                    stderr.write(bytes('\n', 'UTF-8'))
+                    stderr.write(bytes(str(kws), 'UTF-8'))
+                    stderr.write(bytes('\n', 'UTF-8'))
                     cs['stop'] = datetime.utcnow()
                     qout.put([kError, cs['name'], cs])
                 except subprocess.TimeoutExpired:
@@ -152,20 +156,18 @@ def findMatchLanguage(exe, langs):
     for lang in langs:
         if re.match(lang['pattern'], exe):
             return lang
-    return {'language': None, 'execute': './' + exe + ' %(arg)s'}
+    return {'language': None, 'execute': '%(prog)s %(arg)s'}
 
 def getExecutableArgs(exe, langs):
     lang = findMatchLanguage(exe, langs)
-    if not lang:
-        return './%s --show-cases' % exe
-    else:
-        return lang['execute'] % {'prog': exe, 'arg': '--show-cases'}
+    exe = op.abspath(exe)
+    return lang['execute'] % {'prog': exe, 'arg': '--show-cases'}
 
 def collectCases(opts, langs, reqQ, resQ):
     exes = []
     for exe in opts.executables:
         exeArgs = getExecutableArgs(exe, langs)
-        progDir = op.dirname(exe)
+        progDir = op.abspath(op.dirname(exe))
         testDir = op.abspath(op.join(opts.dir, exe))
         if not op.exists(testDir):
             os.makedirs(testDir)
@@ -190,7 +192,7 @@ def collectCases(opts, langs, reqQ, resQ):
         for c in cs:
             cases.append({
                 'name': '%s/%s' % (exe, c),
-                'execute': lang['execute'] % {'prog': exe, 'arg': c},
+                'execute': lang['execute'] % {'prog': op.abspath(exe), 'arg': c},
                 'cwd': res[2]['cwd'],
                 'stdout': op.join(opts.dir, exe, '%s.out' % c),
                 'stderr': op.join(opts.dir, exe, '%s.err' % c)})
@@ -228,10 +230,11 @@ def collectResults(opts, cases, resQ):
             result = colored('kill', 'red')
         else:
             error('cancelled')
-        print('%d/%d %s: %s' % (
+        print('%d/%d %s: %s costs %s secs' % (
             len(passed) + len(failed), caseNum,
             result,
-            res[1]))
+            res[1],
+            str(res[2]['stop'] - res[2]['start'])))
     return passed, failed
 
 if __name__ == '__main__':
@@ -243,6 +246,10 @@ if __name__ == '__main__':
         cases = collectCases(opts, langs, reqQ, resQ)
         cases = filterCases(opts, cases)
         dispatchCases(cases, reqQ)
-        collectResults(opts, cases, resQ)
+        _, failed = collectResults(opts, cases, resQ)
+        print()
+        print('%d failed' % len(failed))
+        for x in failed:
+            print(x['name'])
     finally:
         stopWorkers(reqQ, workers)
