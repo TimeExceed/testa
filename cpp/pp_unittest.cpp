@@ -45,7 +45,7 @@ void tp0(const string&)
 {
     tuple<> tp;
     string res = pp::prettyPrint(tp);
-    TESTA_ASSERT(res == "[]")
+    TESTA_ASSERT(res == "()")
         (res)
         .issue();
 }
@@ -55,7 +55,7 @@ void tp1(const string&)
 {
     tuple<string> tp("abc");
     string res = pp::prettyPrint(tp);
-    TESTA_ASSERT(res == "[\"abc\"]")
+    TESTA_ASSERT(res == "(\"abc\")")
         (res)
         .issue();
 }
@@ -69,7 +69,7 @@ void signed_integers(const string&)
         numeric_limits<int32_t>::min(),
         numeric_limits<int64_t>::min());
     string min = pp::prettyPrint(tp0);
-    TESTA_ASSERT(min == "[-128,-32768,-2147483648,-9223372036854775808]")
+    TESTA_ASSERT(min == "(-128,-32768,-2147483648,-9223372036854775808)")
         (min)
         .issue();
 
@@ -79,7 +79,7 @@ void signed_integers(const string&)
         numeric_limits<int32_t>::max(),
         numeric_limits<int64_t>::max());
     string max = pp::prettyPrint(tp1);
-    TESTA_ASSERT(max == "[127,32767,2147483647,9223372036854775807]")
+    TESTA_ASSERT(max == "(127,32767,2147483647,9223372036854775807)")
         (max)
         .issue();
 }
@@ -93,7 +93,7 @@ void unsigned_integers(const string&)
         numeric_limits<uint32_t>::min(),
         numeric_limits<uint64_t>::min());
     string min = pp::prettyPrint(tp0);
-    TESTA_ASSERT(min == "[0,0,0,0]")
+    TESTA_ASSERT(min == "(0,0,0,0)")
         (min)
         .issue();
 
@@ -103,7 +103,7 @@ void unsigned_integers(const string&)
         numeric_limits<uint32_t>::max(),
         numeric_limits<uint64_t>::max());
     string max = pp::prettyPrint(tp1);
-    TESTA_ASSERT(max == "[255,65535,4294967295,18446744073709551615]")
+    TESTA_ASSERT(max == "(255,65535,4294967295,18446744073709551615)")
         (max)
         .issue();
 }
@@ -113,7 +113,7 @@ void booleans(const string&)
 {
     tuple<bool, bool> tp(true, false);
     string res = pp::prettyPrint(tp);
-    TESTA_ASSERT(res == "[true,false]")
+    TESTA_ASSERT(res == "(true,false)")
         (res)
         .issue();
 }
@@ -123,7 +123,7 @@ void characters(const string&)
 {
     tuple<char, char, char> tp('\n', 'A', 130);
     string res = pp::prettyPrint(tp);
-    TESTA_ASSERT(res == "['\\x0A','A','\\x82']")
+    TESTA_ASSERT(res == "('\\x0A','A','\\x82')")
         (res)
         .issue();
 }
@@ -133,7 +133,7 @@ void floatings(const string&)
 {
     tuple<float, double> tp(1.0, 2.0);
     string res = pp::prettyPrint(tp);
-    TESTA_ASSERT(res == "[1.0000,2.0000]")
+    TESTA_ASSERT(res == "(1.0000,2.0000)")
         (res)
         .issue();
 }

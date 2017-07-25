@@ -49,4 +49,16 @@ struct EnableIf<true, T>
     typedef T Type;
 };
 
+template<class T, class Enable=void>
+struct IsPair
+{
+    static const bool value = false;
+};
+
+template<class T>
+struct IsPair<T, typename mp::EnableIfExists<typename T::second_type, void>::Type>
+{
+    static const bool value = true;
+};
+
 } // namespace mp
