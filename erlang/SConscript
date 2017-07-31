@@ -1,0 +1,9 @@
+# -*- python -*-
+Import('env')
+
+if 'erlang' in ARGUMENTS.get('mode', '').split(','):
+    env.erlc('testa.erl')
+
+if 'dialyzer' in ARGUMENTS.get('mode', '').split(','):
+    env.dialyzer('testa.erl')
+

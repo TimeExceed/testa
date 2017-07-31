@@ -1,26 +1,28 @@
 # -*- python -*-
 Import('env')
 
-env03 = env.Clone()
-env03.MergeFlags({'CXXFLAGS': ['--std=c++03']})
-env03.InstallAs('testa03.cpp', 'testa.cpp')
-env03.InstallAs('prettyprint03.cpp', 'prettyprint.cpp')
-env03.InstallAs('pp03_unittest.cpp', 'pp_unittest.cpp')
-env03.InstallAs('testa03_unittest.cpp', 'testa_unittest.cpp')
-env03.InstallAs('testa_main03.cpp', 'testa_main.cpp')
-env03.Program('cpp03_unittest',
-              env03.Object(['testa03.cpp', 'prettyprint03.cpp',
-                            'testa_main03.cpp',
-                            'pp03_unittest.cpp', 'testa03_unittest.cpp']))
+if 'cpp03' in ARGUMENTS.get('mode', '').split(','):
+    env03 = env.Clone()
+    env03.MergeFlags({'CXXFLAGS': ['--std=c++03']})
+    env03.InstallAs('testa03.cpp', 'testa.cpp')
+    env03.InstallAs('prettyprint03.cpp', 'prettyprint.cpp')
+    env03.InstallAs('pp03_unittest.cpp', 'pp_unittest.cpp')
+    env03.InstallAs('testa03_unittest.cpp', 'testa_unittest.cpp')
+    env03.InstallAs('testa_main03.cpp', 'testa_main.cpp')
+    env03.Program('cpp03_unittest',
+                  env03.Object(['testa03.cpp', 'prettyprint03.cpp',
+                                'testa_main03.cpp',
+                                'pp03_unittest.cpp', 'testa03_unittest.cpp']))
 
-env11 = env.Clone()
-env11.MergeFlags({'CXXFLAGS': ['--std=c++11']})
-env11.InstallAs('testa11.cpp', 'testa.cpp')
-env11.InstallAs('prettyprint11.cpp', 'prettyprint.cpp')
-env11.InstallAs('pp11_unittest.cpp', 'pp_unittest.cpp')
-env11.InstallAs('testa11_unittest.cpp', 'testa_unittest.cpp')
-env11.InstallAs('testa_main11.cpp', 'testa_main.cpp')
-env11.Program('cpp11_unittest',
-              env11.Object(['testa11.cpp', 'prettyprint11.cpp',
-                            'testa_main11.cpp',
-                            'pp11_unittest.cpp', 'testa11_unittest.cpp']))
+if 'cpp11' in ARGUMENTS.get('mode', '').split(','):
+    env11 = env.Clone()
+    env11.MergeFlags({'CXXFLAGS': ['--std=c++11']})
+    env11.InstallAs('testa11.cpp', 'testa.cpp')
+    env11.InstallAs('prettyprint11.cpp', 'prettyprint.cpp')
+    env11.InstallAs('pp11_unittest.cpp', 'pp_unittest.cpp')
+    env11.InstallAs('testa11_unittest.cpp', 'testa_unittest.cpp')
+    env11.InstallAs('testa_main11.cpp', 'testa_main.cpp')
+    env11.Program('cpp11_unittest',
+                  env11.Object(['testa11.cpp', 'prettyprint11.cpp',
+                                'testa_main11.cpp',
+                                'pp11_unittest.cpp', 'testa11_unittest.cpp']))

@@ -1,6 +1,8 @@
+# -*- python -*-
 Import('env')
 
-testa = env.compileAndJar('testa.jar', 'testa')
-env.compileAndJar('example.jar', 'example', libs=[testa], standalone=True,
-  main='example.main')
-env.InstallAs('puretest.jar', 'example.jar')
+if 'clj' in ARGUMENTS.get('mode', '').split(','):
+    testa = env.compileAndJar('testa.jar', 'testa') 
+    env.compileAndJar('example.jar', 'example', libs=[testa], standalone=True,
+        main='example.main')
+    env.InstallAs('puretest.jar', 'example.jar')
