@@ -215,5 +215,22 @@ def subdirs(self, *dirs):
     return self.SConscript(dirs=Flatten(dirs), exports={'env':self})
 env.AddMethod(subdirs)
 
+def erlc(target, source, env):
+    for src in source:
+        subprocess.check_call(['/usr/bin/erlc', src.abspath],
+                              cwd=path.dirname(src.abspath))
+
+env.Append(BUILDERS={'erlc': Builder(action=erlc, suffix='.beamer')})
+
+def dialyzer(target, source, env):
+    for src,tgt in zip(source, target):
+        with open(tgt.abspath, 'w') as fp:
+            subprocess.check_call(
+                ['/usr/bin/dialyzer', src.abspath],
+                stderr=subprocess.STDOUT,
+                stdout=fp)
+
+env.Append(BUILDERS={'dialyzer': Builder(action=dialyzer, suffix='.dialyzer')})
+
 env.SConscriptChdir(1)
 env.SConscript('$BUILD_DIR/SConscript', exports='env')
