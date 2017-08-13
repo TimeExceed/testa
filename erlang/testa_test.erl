@@ -57,49 +57,50 @@ gcdtb_(Case, [H|T]) ->
 gcdtb(Case) ->
     Ins = [{X, Y} || X <- lists:seq(0, 12), Y <- lists:seq(0, 12), (X /= 0) or (Y /= 0)],
     gcdtb_(Case, Ins).
-            
-main(Args) ->
-    Cases = #{
-      "testTesta.correctAddition" => 
+
+cases() ->
+    #{"testTesta.correctAddition" => 
           testa:is(
-            fun() -> 1 + 2 end,
+            fun(_) -> 1 + 2 end,
             3),
       "testTesta.wrongAddition" =>
           testa:is(
-           fun() -> 1 + 2 end,
+           fun(_) -> 1 + 2 end,
            2),
       "testTesta.correctMultiple" =>
           testa:eq(
-            fun({X,Y}) -> X*Y end,
-            fun({X,Y}) -> lists:sum([X || _ <- lists:seq(1, Y)]) end,
-            fun(X) -> multipleTb(X) end),
+            fun(_, {X,Y}) -> X*Y end,
+            fun(_, {X,Y}) -> lists:sum([X || _ <- lists:seq(1, Y)]) end,
+            fun(_, X) -> multipleTb(X) end),
       "testTesta.wrongMultiple" =>
           testa:eq(
-            fun({X,Y}) -> X+Y end,
-            fun({X,Y}) -> lists:sum([X || _ <- lists:seq(1, Y)]) end,
-            fun(X) -> multipleTb(X) end),
+            fun(_, {X,Y}) -> X+Y end,
+            fun(_, {X,Y}) -> lists:sum([X || _ <- lists:seq(1, Y)]) end,
+            fun(_, X) -> multipleTb(X) end),
       "testTesta.correctGcdIs" =>
           testa:is(
-            fun({X, Y}) -> gcd(X, Y) end,
+            fun(_, {X, Y}) -> gcd(X, Y) end,
             4,
-            fun(Case) -> Case({8, 12}) end),
+            fun(_, Case) -> Case({8, 12}) end),
       "testTesta.correctGcd" =>
           testa:verify(
-            fun({X,Y}) -> gcd(X, Y) end,
-            fun(Result, {X, Y}) ->
+            fun(_, {X,Y}) -> gcd(X, Y) end,
+            fun(_, Result, {X, Y}) ->
                     if (X rem Result =:= 0) and (Y rem Result =:= 0) -> ok;
                        true -> {error, io_lib:format("~p/=gcd(~p,~p)", [Result, X, Y])}
                     end
             end,
-            fun(X) -> gcdtb(X) end),
+            fun(_, X) -> gcdtb(X) end),
       "testTesta.wrongGcd" =>
           testa:verify(
-            fun({X,Y}) -> gcd(X, Y) end,
-            fun(Result, {X, Y}) ->
+            fun(_, {X,Y}) -> gcd(X, Y) end,
+            fun(_, Result, {X, Y}) ->
                     if (X rem Result /= 0) or (Y rem Result /= 0) -> ok;
                        true -> {error, io_lib:format("~p/=gcd(~p,~p)", [Result, X, Y])}
                     end
             end,
-            fun(X) -> gcdtb(X) end)},
-    testa:main(Args, Cases).
+            fun(_, X) -> gcdtb(X) end)}.
+            
+main(Args) ->
+    testa:main(Args, cases()).
 

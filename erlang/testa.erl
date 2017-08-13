@@ -36,37 +36,31 @@
 %% API functions
 %%====================================================================
 
--spec is(fun(() -> any()), any()) -> fun(() -> ok | {error, string()}).
-
 is(Fn, ExpVal) ->
-    fun() ->
-            RealVal = Fn(),
+    fun(CaseName) ->
+            RealVal = Fn(CaseName),
             if RealVal =:= ExpVal -> ok;
                true -> {error, io_lib:format("Expect=~p Got=~p", [ExpVal, RealVal])}
             end
     end.
 
 is(Fn, ExpVal, Tb) ->
-    fun() ->
-            Tb(fun(X) ->
-                       RealVal = Fn(X),
+    fun(CaseName) ->
+            Tb(CaseName, 
+               fun(X) ->
+                       RealVal = Fn(CaseName, X),
                        if RealVal =:= ExpVal -> ok;
                           true -> {error, io_lib:format("Expect=~p Got=~p", [ExpVal, RealVal])}
                        end
                end)
     end.
 
--spec eq(
-        fun((In) -> any()), 
-        fun((In) -> any()),
-        fun((fun((In) -> ok | {error, string()})) -> ok | {error, string()})) 
-        -> fun(() -> ok | {error, string()}).
-
 eq(TrialFn, OracleFn, Tb) ->
-    fun() -> Tb(
+    fun(CaseName) -> 
+            Tb(CaseName,
                fun(In) ->
-                       RealVal = TrialFn(In),
-                       ExpVal = OracleFn(In),
+                       RealVal = TrialFn(CaseName, In),
+                       ExpVal = OracleFn(CaseName, In),
                        if RealVal =:= ExpVal -> ok;
                           true -> {error, io_lib:format("Expect=~p Got=~p Input=~p", [ExpVal, RealVal, In])}
                        end
@@ -74,14 +68,13 @@ eq(TrialFn, OracleFn, Tb) ->
     end.
 
 verify(TrialFn, OracleFn, Tb) ->
-    fun() -> Tb(
+    fun(CaseName) -> 
+            Tb(CaseName,
                fun(In) ->
-                       Result = TrialFn(In),
-                       OracleFn(Result, In)
+                       Result = TrialFn(CaseName, In),
+                       OracleFn(CaseName, Result, In)
                end)
     end.
-
--spec main([string()], #{string()=>fun(() -> ok | {error, string()})}) -> none().
 
 main(Args, Cases) ->
     if length(Args) /= 1 -> 
@@ -105,7 +98,7 @@ main(Args, Cases) ->
                             io:format(standard_error, "unknown case: ~s~n", [Arg]),
                             halt(1);
                         {ok, Case} ->
-                            case Case() of
+                            case Case(Arg) of
                                 ok -> halt(0);
                                 {error, Msg} -> 
                                     io:format(standard_error, "Case fail: ~s~n", [Msg]),
