@@ -377,11 +377,16 @@ struct PrettyPrinterCategory<const char[N], void>
 {
     typedef CString Category;
 };
+template<int N>
+struct PrettyPrinterCategory<char[N], void>
+{
+    typedef CString Category;
+};
 
 template<class CStrLike>
 struct PrettyPrinter<CString, CStrLike>
 {
-    void operator()(std::string& out, const CStrLike cs) const
+    void operator()(std::string& out, const char* cs) const
     {
         out.append(cs);
     }
