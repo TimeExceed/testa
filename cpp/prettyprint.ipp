@@ -30,13 +30,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "metaprogramming.hpp"
-
+#include <string>
+#include <deque>
+#include <cstdlib>
+    
 #if __cplusplus < 201103L
-#include <tr1/type_traits>
 #include <tr1/tuple>
 #include <stdint.h>
 #else
-#include <type_traits>
 #include <tuple>
 #include <cstdint>
 #endif
@@ -44,159 +45,154 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace pp {
 namespace impl {
 
-struct SignedInteger
+template<class T, void (T::*)(std::string&) const>
+struct IsPrettyPrintable
 {
-    static void prettyPrint(std::string&, int64_t);
-};
-struct UnsignedInteger
-{
-    static void prettyPrint(std::string&, uint64_t);
-};
-struct Boolean
-{
-    static void prettyPrint(std::string&, bool);
-};
-struct Character
-{
-    static void prettyPrint(std::string&, char);
+    typedef void Type;
 };
 
 template<class T>
-#if __cplusplus < 201103L
-struct PrettyPrinterCategory<T, typename mp::EnableIf<std::tr1::is_integral<T>::value, void>::Type>
-#else
-struct PrettyPrinterCategory<T, typename mp::EnableIf<std::is_integral<T>::value, void>::Type>
-#endif
+struct PrettyPrinter<
+    T,
+    typename IsPrettyPrintable<T, &T::prettyPrint>::Type>
 {
-    template<class T0, class Enable = void>
-    struct Tester
+    void operator()(std::string& out, const T& x) const
     {
-        typedef UnsignedInteger Category;
-    };
-    template<class T0>
-#if __cplusplus < 201103L
-    struct Tester<T0, typename mp::EnableIf<std::tr1::is_signed<T0>::value, void>::Type>
-#else
-    struct Tester<T0, typename mp::EnableIf<std::is_signed<T0>::value && !std::is_same<T0, char>::value, void>::Type>
-#endif
-    {
-        typedef SignedInteger Category;
-    };
-    template<class T0>
-#if __cplusplus < 201103L
-    struct Tester<T0, typename mp::EnableIf<std::tr1::is_same<T0, bool>::value, void>::Type>
-#else
-    struct Tester<T0, typename mp::EnableIf<std::is_same<T0, bool>::value, void>::Type>
-#endif
-    {
-        typedef Boolean Category;
-    };
-    template<class T0>
-#if __cplusplus < 201103L
-    struct Tester<T0, typename mp::EnableIf<std::tr1::is_same<T0, char>::value, void>::Type>
-#else
-    struct Tester<T0, typename mp::EnableIf<std::is_same<T0, char>::value, void>::Type>
-#endif
-    {
-        typedef Character Category;
-    };
-    
-    typedef typename Tester<T>::Category Category;
+        x.prettyPrint(out);
+    }
 };
 
-template<class T>
-struct PrettyPrinter<SignedInteger, T>
+template<>
+struct PrettyPrinter<bool, void>
 {
-    void operator()(std::string& out, T x) const
+    void operator()(std::string& out, bool x) const
     {
-        SignedInteger::prettyPrint(out, x);
-    }
+        static const char kTrue[] = "true";
+        static const char kFalse[] = "false";
+        if (x) {
+            out.append(kTrue, sizeof(kTrue) - 1);
+        } else {
+            out.append(kFalse, sizeof(kFalse) - 1);
+        }
+    };
 };
-template<class T>
-struct PrettyPrinter<UnsignedInteger, T>
+
+inline void toHex(std::string& out, uint8_t x)
 {
-    void operator()(std::string& out, T x) const
+    static const char kAlphabet[] = "0123456789ABCDEF";
+    if (x > 15) {
+        ::abort();
+    }
+    out.push_back(kAlphabet[x]);
+}
+
+struct Char
+{
+    static void p(std::string& out, char x)
     {
-        UnsignedInteger::prettyPrint(out, x);
-    }
+        uint8_t xx = x;
+        if (xx >= 32 && xx <= 127) {
+            if (x == '\'') {
+                out.push_back('\\');
+                out.push_back('\'');
+            } else if (x == '"') {
+                out.push_back('\\');
+                out.push_back('"');
+            } else {
+                out.push_back(x);
+            }
+        } else {
+            out.push_back('\\');
+            out.push_back('x');
+            toHex(out, xx >> 4);
+            toHex(out, xx & 0xF);
+        }
+    };
 };
-template<class T>
-struct PrettyPrinter<Boolean, T>
+
+template<>
+struct PrettyPrinter<char, void>
 {
-    void operator()(std::string& out, T x) const
-    {
-        Boolean::prettyPrint(out, x);
-    }
-};
-template<class T>
-struct PrettyPrinter<Character, T>
-{
-    void operator()(std::string& out, T x) const
+    void operator()(std::string& out, char x) const
     {
         out.push_back('\'');
-        Character::prettyPrint(out, x);
+        Char::p(out, x);
         out.push_back('\'');
+    };
+};
+
+template<class T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<mp::IsInteger<T>::value && mp::IsUnsigned<T>::value>::Type>
+{
+    void operator()(std::string& out, T x) const
+    {
+        if (x == 0) {
+            out.push_back('0');
+        } else {
+            std::deque<uint8_t> xs;
+            for(; x > 0; x /= 10) {
+                xs.push_back(x % 10);
+            }
+            for(; !xs.empty(); xs.pop_back()) {
+                out.push_back('0' + xs.back());
+            }
+        }
+    };
+};
+
+template<>
+struct PrettyPrinter<std::string, void>
+{
+    void operator()(std::string& out, const std::string& x) const
+    {
+        out.push_back('\"');
+        for(std::string::const_iterator i = x.begin(); i != x.end(); ++i) {
+            Char::p(out, *i);
+        }
+        out.push_back('\"');
     }
 };
 
+template<class T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<mp::IsInteger<T>::value && mp::IsSigned<T>::value>::Type>
+{
+    void operator()(std::string& out, T x) const
+    {
+        typename mp::MakeUnsigned<T>::Type y = x >= 0 ? x : -x;
+        if (x < 0) {
+            out.push_back('-');
+        }
+        pp::prettyPrint(out, y);
+    };
+};
 
 struct Floating
 {
-    static void prettyPrint(std::string&, double);
+    static void p(std::string&, double);
 };
 
 template<class T>
-#if __cplusplus < 201103L
-struct PrettyPrinterCategory<T, typename mp::EnableIf<std::tr1::is_floating_point<T>::value, void>::Type>
-#else
-struct PrettyPrinterCategory<T, typename mp::EnableIf<std::is_floating_point<T>::value, void>::Type>
-#endif
-{
-    typedef Floating Category;
-};
-
-template<class T>
-struct PrettyPrinter<Floating, T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<mp::IsFloatingPoint<T>::value>::Type>
 {
     void operator()(std::string& out, T x) const
     {
-        Floating::prettyPrint(out, x);
+        Floating::p(out, x);
     }
 };
 
-
-class StlStr {};
-class StlSeq {};
-class StlMap {};
-
 template<class T>
-struct PrettyPrinterCategory<T, typename mp::EnableIfExists<typename T::value_type, void>::Type>
-{
-    template<class T0, class Enable = void>
-    struct SeqMap
-    {
-        typedef StlSeq Category;
-    };
-    template<class T0>
-    struct SeqMap<T0, typename mp::EnableIf<mp::IsPair<typename T0::value_type>::value, void>::Type>
-    {
-        typedef StlMap Category;
-    };
-    template<class T0>
-#if __cplusplus < 201103L
-    struct SeqMap<T0, typename mp::EnableIf<std::tr1::is_same<T0, std::string>::value, void>::Type>
-#else
-    struct SeqMap<T0, typename mp::EnableIf<std::is_same<T0, std::string>::value, void>::Type>
-#endif
-    {
-        typedef StlStr Category;
-    };
-
-    typedef typename SeqMap<T>::Category Category; 
-};
-
-template<class T>
-struct PrettyPrinter<StlSeq, T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<
+        mp::IsSeq<T>::value
+        && !mp::IsAssociative<T>::value
+        && !mp::IsSame<T, std::string>::value>::Type>
 {
     void operator()(std::string& out, const T& xs) const
     {
@@ -216,7 +212,9 @@ struct PrettyPrinter<StlSeq, T>
 };
 
 template<class T>
-struct PrettyPrinter<StlMap, T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<mp::IsAssociative<T>::value>::Type>
 {
     void operator()(std::string& out, const T& xs) const
     {
@@ -239,23 +237,10 @@ struct PrettyPrinter<StlMap, T>
     }
 };
 
-template<>
-struct PrettyPrinter<StlStr, std::string>
-{
-    void operator()(std::string& out, const std::string& s) const;
-};
-
-
-class StlSmartPtr {};
-
 template<class T>
-struct PrettyPrinterCategory<T, typename mp::EnableIfExists<typename T::element_type, void>::Type>
-{
-    typedef StlSmartPtr Category;
-};
-
-template<class T>
-struct PrettyPrinter<StlSmartPtr, T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<mp::IsSmartPtr<T>::value>::Type>
 {
     void operator()(std::string& out, const T& ptr) const
     {
@@ -268,123 +253,104 @@ struct PrettyPrinter<StlSmartPtr, T>
 };
 
 
-class StlTuple {};
-
 #if __cplusplus < 201103L
-
 template<class T>
-struct PrettyPrinterCategory<T, typename mp::EnableIfExists<typename std::tr1::tuple_element<0, T>::type, void>::Type>
+struct _TupleSize
 {
-    typedef StlTuple Category;
+    static const std::size_t value = std::tr1::tuple_size<T>::value;
 };
-template<>
-struct PrettyPrinterCategory<std::tr1::tuple<>, void>
+template<class T, std::size_t n>
+const typename std::tr1::tuple_element<n, T>::type& _getTuple(const T& xs)
 {
-    typedef StlTuple Category;
-};
-
-template<class T, int idx, bool stop>
-struct TuplePrettyPrinter
-{
-    void operator()(std::string& out, const T& tp) const
-    {
-        if (idx > 0) {
-            out.push_back(',');
-        }
-        out.append(prettyPrint(std::tr1::get<idx>(tp)));
-        TuplePrettyPrinter<T, idx + 1, idx + 1 >= std::tr1::tuple_size<T>::value> nxt;
-        nxt(out, tp);
-    }
-};
-
-template<class T, int idx>
-struct TuplePrettyPrinter<T, idx, true>
-{
-    void operator()(std::string& out, const T& tp) const
-    {}
-};
-
-template<class T>
-struct PrettyPrinter<StlTuple, T>
-{
-    void operator()(std::string& out, const T& tp) const
-    {
-        out.push_back('(');
-        TuplePrettyPrinter<T, 0, 0 == std::tr1::tuple_size<T>::value> head;
-        head(out, tp);
-        out.push_back(')');
-    }
-};
-
+    return std::tr1::get<n>(xs);
+}
 #else
-
 template<class T>
-struct PrettyPrinterCategory<T, typename mp::EnableIfExists<typename std::tuple_element<0, T>::type, void>::Type>
+struct _TupleSize
 {
-    typedef StlTuple Category;
+    static const std::size_t value = std::tuple_size<T>::value;
 };
-template<>
-struct PrettyPrinterCategory<std::tuple<>, void>
+template<class T, std::size_t n>
+const typename std::tuple_element<n, T>::type& _getTuple(const T& xs)
 {
-    typedef StlTuple Category;
-};
-
-template<class T, int idx, bool stop>
-struct TuplePrettyPrinter
-{
-    void operator()(std::string& out, const T& tp) const
-    {
-        if (idx > 0) {
-            out.push_back(',');
-        }
-        out.append(prettyPrint(std::get<idx>(tp)));
-        TuplePrettyPrinter<T, idx + 1, idx + 1 >= std::tuple_size<T>::value> nxt;
-        nxt(out, tp);
-    }
-};
-
-template<class T, int idx>
-struct TuplePrettyPrinter<T, idx, true>
-{
-    void operator()(std::string& out, const T& tp) const
-    {}
-};
-
-template<class T>
-struct PrettyPrinter<StlTuple, T>
-{
-    void operator()(std::string& out, const T& tp) const
-    {
-        out.push_back('(');
-        TuplePrettyPrinter<T, 0, 0 == std::tuple_size<T>::value> head;
-        head(out, tp);
-        out.push_back(')');
-    }
-};
-
+    return std::get<n>(xs);
+}
 #endif
 
-struct CString {};
+template<class T, std::size_t idx, bool end>
+struct _TuplePrettyPrint
+{
+    void operator()(std::string& out, const T& xs) const
+    {
+        pp::prettyPrint(out, _getTuple<T, idx>(xs));
+        if (idx + 1 == _TupleSize<T>::value) {
+            return;
+        }
+        out.push_back(',');
+        _TuplePrettyPrint<
+            T,
+            idx + 1,
+            idx + 1 == _TupleSize<T>::value> p;
+        p(out, xs);
+    }
+};
+
+template<class T, std::size_t idx>
+struct _TuplePrettyPrint<T, idx, true>
+{
+    void operator()(std::string& out, const T& xs) const
+    {}
+};
+
+#if __cplusplus < 201103L
+template<std::size_t n>
+struct __TupleSize
+{
+    static const bool value = (n >= 0);
+};
+
+template<class T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIf<__TupleSize<std::tr1::tuple_size<T>::value>::value>::Type>
+{
+    void operator()(std::string& out, const T& xs) const
+    {
+        out.push_back('(');
+        _TuplePrettyPrint<T, 0, std::tr1::tuple_size<T>::value == 0> p;
+        p(out, xs);
+        out.push_back(')');
+    }
+
+};
+#else
+template<class T>
+struct PrettyPrinter<
+    T,
+    typename mp::VoidIfExists<typename std::tuple_size<T>::value_type>::Type>
+{
+    void operator()(std::string& out, const T& xs) const
+    {
+        out.push_back('(');
+        _TuplePrettyPrint<T, 0, std::tuple_size<T>::value == 0> p;
+        p(out, xs);
+        out.push_back(')');
+    }
+
+};
+#endif
+
+template<int n>
+struct PrettyPrinter<const char[n], void>
+{
+    void operator()(std::string& out, const char* cs) const
+    {
+        out.append(cs, n);
+    }
+};
 
 template<>
-struct PrettyPrinterCategory<const char*, void>
-{
-    typedef CString Category;
-};
-
-template<int N>
-struct PrettyPrinterCategory<const char[N], void>
-{
-    typedef CString Category;
-};
-template<int N>
-struct PrettyPrinterCategory<char[N], void>
-{
-    typedef CString Category;
-};
-
-template<class CStrLike>
-struct PrettyPrinter<CString, CStrLike>
+struct PrettyPrinter<const char*, void>
 {
     void operator()(std::string& out, const char* cs) const
     {
