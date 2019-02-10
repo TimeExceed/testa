@@ -115,7 +115,7 @@ local function main(tbl)
         end
         os.exit(0)
     elseif action == 'case' then
-        local suite, name = string.match(case, '(%w+)[.](%w+)')
+        local suite, name = string.match(case, '([_%w]+)[.]([_%w]+)')
         if not tbl[suite] or not tbl[suite][name] then
             print(string.format('unknown case: %s', case))
             os.exit(1)
