@@ -141,7 +141,7 @@ Testa for lua provides 3 functions: `is`, `eq` and `verify`.
 There is no counterpart of `:throw` in clojure.
 It is unwise to raise exceptions in lua.
 
-#### is
+#### testa.is
 
 `is` takes 3 arguments: a function without arguments `casefunc`, a result `expect` and an optional testbench function `tb`.
 
@@ -158,7 +158,7 @@ testTesta.correctAddition = testa.is(
 )
 ```
 
-#### eq
+#### testa.eq
 
 `eq` takes also 3 arguments: a function to test `casefunc`, a function `oracle`, and an optional testbench function `tb`.
 `casefunc` and `oracle` must be able to be applied by same arguments.
@@ -193,7 +193,7 @@ testTesta.correctMultiple = testa.eq(
 )
 ```
 
-#### verify
+#### testa.verify
 
 `verify` takes also 3 arguments: a function to test `casefunc`, a function `oracle` and an optional testbench function `tb`.
 
