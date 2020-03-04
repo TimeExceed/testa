@@ -141,7 +141,9 @@ Testa for lua provides 3 functions: `is`, `eq` and `verify`.
 There is no counterpart of `:throw` in clojure.
 It is unwise to raise exceptions in lua.
 
-* `is` takes 3 arguments: a function without arguments `casefunc`, a result `expect` and an optional testbench function `tb`.
+#### is
+
+`is` takes 3 arguments: a function without arguments `casefunc`, a result `expect` and an optional testbench function `tb`.
 
   The testbench function prepares the environment for running the case.
   It takes a 0-ary function `case` as its single argument.
@@ -156,12 +158,14 @@ testTesta.correctAddition = testa.is(
 )
 ```
 
-* `eq` takes also 3 arguments: a function to test `casefunc`, a function `oracle`, and an optional testbench function `tb`.
-  `casefunc` and `oracle` must be able to be applied by same arguments.
+#### eq
 
-  `tb` takes a function `case`.
-  It prepares environment, generates one or more stimulus and applies this/these stimulus on `case`.
-  When `case` is invoked, it applies stimulus on both `casefunc` and `oracle` and compares their results.
+`eq` takes also 3 arguments: a function to test `casefunc`, a function `oracle`, and an optional testbench function `tb`.
+`casefunc` and `oracle` must be able to be applied by same arguments.
+
+`tb` takes a function `case`.
+It prepares environment, generates one or more stimulus and applies this/these stimulus on `case`.
+When `case` is invoked, it applies stimulus on both `casefunc` and `oracle` and compares their results.
 
 ```lua
 testTesta.correctMultiple = testa.eq(
@@ -170,7 +174,7 @@ testTesta.correctMultiple = testa.eq(
     end,
     function (x, y)
         local r = 0
-        for i = 1, y do 
+        for i = 1, y do
             r = r + x
         end
         return r
@@ -189,13 +193,15 @@ testTesta.correctMultiple = testa.eq(
 )
 ```
 
-* `verify` takes also 3 arguments: a function to test `casefunc`, a function `oracle` and an optional testbench function `tb`.
+#### verify
 
-  `tb` takes a function `case`.
-  It prepares environment, generates one or more stimulus and applies this/these stimulus on `case`.
-  When `case` is invoked, it applies stimulus on `casefunc`, and then invokes `oracle` by both the result of `casefunc` and the stimulus to see whether the result is okey.
+`verify` takes also 3 arguments: a function to test `casefunc`, a function `oracle` and an optional testbench function `tb`.
 
-  `verify` is quite suitable for those cases which verifying them is easier than computing them.
+`tb` takes a function `case`.
+It prepares environment, generates one or more stimulus and applies this/these stimulus on `case`.
+When `case` is invoked, it applies stimulus on `casefunc`, and then invokes `oracle` by both the result of `casefunc` and the stimulus to see whether the result is okey.
+
+`verify` is quite suitable for those cases which verifying them is easier than computing them.
 
 ```lua
 local function gcd(a, b)
@@ -245,6 +251,136 @@ Testa also provides a main function as an entry point.
 testa.main({TestTesta = testTesta})
 ```
 
+### In Python
+
+Please take a look at `python/testa_test.py` for examples.
+Testa works only under Python3.
+
+#### testa.is_
+
+`testa.is_` compares the result of a trial function with an expected value.
+
+```python
+@testa.is_(expect=3)
+def correct_addition():
+    return 1 + 2
+
+@testa.is_(expect=3)
+def wrong_addition():
+    return 2 + 2
+```
+
+Testa will automatically generate 2 test cases,
+`python.testa_test.correct_addition` and `python.testa_test.wrong_addition`.
+`correct_addition` is name of the trial function.
+`testa_test`, actually `testa_test.py`, is name of python file where the trial function resides.
+And `python` is the path to this file.
+
+When this test case runs,
+testa first runs the trial function,
+and then compares the result with value to `expect`
+(in the example case, 3).
+
+If the result is incorrect,
+something like `expect: 3 actual: 4` will be written to stdout,
+and be collected by `runtests.py`.
+
+#### testa.eq
+
+`testa.eq` takes a test bench and an oracle.
+
+```python
+def multiple_tb(case_f):
+    for i in range(5):
+        for j in range(5):
+            res = case_f(i, j)
+            if res is not None:
+                return res
+
+def multiple_oracle(x, y):
+    return sum(x for _ in range(y))
+
+@testa.eq(testbench=multiple_tb, oracle=multiple_oracle)
+def correct_multiple(x, y):
+    return x * y
+
+@testa.eq(testbench=multiple_tb, oracle=multiple_oracle)
+def wrong_multiple(x, y):
+    return x + y
+```
+
+As you can see,
+test benches generate serieses of inputs
+(and/or set up environments)
+and feeds these inputs to both oracles and trials.
+Testa will compare results from both oracles and trials.
+Once inequivalence, something like
+`expect: 0 actual: 1 by applying (0, 1)`
+, (result from the oracle, result from the trial, and their arguments),
+will be written to stdout.
+
+#### testa.verify
+
+`testa.verify` checks propositions hold between inputs and results.
+For examples,
+
+```python
+def gcd_tb(case_f):
+    for a in range(13):
+        for b in range(13):
+            if a == 0 and b == 0:
+                continue
+            result = case_f(a, b)
+            if result is not None:
+                return result
+
+def gcd(a, b):
+    if a == 0:
+        return b
+    else:
+        return gcd(b % a, a)
+
+@testa.verify(testbench=gcd_tb, trial=gcd)
+def correct_verifer(result, a, b):
+    if a == 0 and b == 0:
+        return 'undefined on (0, 0)'
+    if a % result != 0:
+        return '{} can not divided by {}'.format(a, result)
+    if b % result != 0:
+        return '{} can not divided by {}'.format(b, result)
+
+@testa.verify(testbench=gcd_tb, trial=gcd)
+def wrong_verifier(result, a, b):
+    if a == 0 and b == 0:
+        return 'undefined on (0, 0)'
+    if a == 1:
+        return 'fake error on a=1'
+```
+
+Test benches,
+as those for `testa.eq`,
+generate serieses of inputs and/or set up environments.
+Actually, you can reuse test benches for `testa.eq`.
+A verifier takes the result from the trial and the arguments.
+It checks a proposition between the result and these arguments.
+Once it fails, a verifier should return an error message to say what happened.
+
+#### testa.throw
+
+`testa.throw` checks if the trial throws an expected exception.
+
+```python
+@testa.throw(throw=KeyError)
+def throw_correct():
+    empty = {}
+    empty['xxx']
+
+@testa.throw(throw=IOError)
+def throw_wrong():
+    empty = {}
+    empty['xxx']
+```
+
 ## How to run tests
 
 Here are some examples.
@@ -273,9 +409,9 @@ We can see 7 out of 13 cases are failed.
 There must be a work directory for `runtests.py`.
 By default, it is `test_results/` under current directory.
 One can look at `test_results/report.json` for results of all cases,
-and `test_results/EXECUTABLE.TESTCASE.out` or `test_results/EXECUTABLE.TESTCASE.err`, 
+and `test_results/EXECUTABLE.TESTCASE.out` or `test_results/EXECUTABLE.TESTCASE.err`,
 where `TESTCASE` must be replaced by real case name,
-and `EXECUTABLE` by `example.jar`, 
+and `EXECUTABLE` by `example.jar`,
 for both standard out and standard err for output of this test case.
 
     $ ls -1 test_results/
@@ -287,23 +423,23 @@ for both standard out and standard err for output of this test case.
     ...
     $ cat test_results/report.json
     {
-      "startTimestamp": "2014-10-18T07:29:14.601880Z", 
+      "startTimestamp": "2014-10-18T07:29:14.601880Z",
       "endTimestamp": "2014-10-18T07:29:36.529804Z",
       "cases": [
         {
-          "executable": "example.jar", 
-          "casename": "example.main.eq-case1", 
-          "result": "PASS", 
-          "class": "functional test", 
+          "executable": "example.jar",
+          "casename": "example.main.eq-case1",
+          "result": "PASS",
+          "class": "functional test",
           ...
-        }, 
+        },
         {
-          "executable": "example.jar", 
-          "casename": "example.main.eq-fail-case2", 
-          "result": "FAIL", 
-          "class": "functional test", 
+          "executable": "example.jar",
+          "casename": "example.main.eq-fail-case2",
+          "result": "FAIL",
+          "class": "functional test",
           ...
-        }, 
+        },
         ...
       ]
     }
