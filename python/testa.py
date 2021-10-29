@@ -1,14 +1,8 @@
 import argparse
 import sys
+from pathlib import Path
 
 fixtures = {}
-
-def _get_fixture(trial_f):
-    fixt = trial_f.__globals__['__file__']
-    assert len(fixt) > 3 and fixt[-3:] == '.py'
-    fixt = fixt[0:-3]
-    fixt = fixt.replace('/', '.')
-    return fixt
 
 def _is_testbench(trial_f, expect):
     actual = trial_f()
@@ -20,8 +14,7 @@ def is_(**kws):
         global fixtures
         casename = trial_f.__name__
         expect = kws['expect']
-        fullname = '.'.join([_get_fixture(trial_f), casename])
-        fixtures[fullname] = lambda: _is_testbench(trial_f, expect)
+        fixtures[casename] = lambda: _is_testbench(trial_f, expect)
     return go
 
 def _eq_case_f(trial_f, oracle_f, *args):
@@ -37,11 +30,10 @@ def eq(**kws):
     def go(trial_f):
         global fixtures
         casename = trial_f.__name__
-        fullname = '.'.join([_get_fixture(trial_f), casename])
         tb = kws['testbench']
         oracle_f = kws['oracle']
         case_f = lambda *args: _eq_case_f(trial_f, oracle_f, *args)
-        fixtures[fullname] = lambda: tb(case_f)
+        fixtures[casename] = lambda: tb(case_f)
     return go
 
 def _verify_case_f(trial_f, verifier, *args):
@@ -54,11 +46,10 @@ def verify(**kws):
     def go(verifier_f):
         global fixtures
         casename = verifier_f.__name__
-        fullname = '.'.join([_get_fixture(verifier_f), casename])
         tb = kws['testbench']
         trial_f = kws['trial']
         case_f = lambda *args: _verify_case_f(trial_f, verifier_f, *args)
-        fixtures[fullname] = lambda: tb(case_f)
+        fixtures[casename] = lambda: tb(case_f)
     return go
 
 def _throws_tb(trial_f, expect_except):
@@ -73,9 +64,8 @@ def throw(**kws):
     def go(trial_f):
         global fixtures
         casename = trial_f.__name__
-        fullname = '.'.join([_get_fixture(trial_f), casename])
         expect_throw = kws['throw']
-        fixtures[fullname] = lambda: _throws_tb(trial_f, expect_throw)
+        fixtures[casename] = lambda: _throws_tb(trial_f, expect_throw)
     return go
 
 def _parse_args():

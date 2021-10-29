@@ -42,7 +42,6 @@ from functools import partial
 from itertools import groupby
 from datetime import datetime
 import argparse
-import termcolor
 
 def countCpu():
     try:
@@ -198,11 +197,23 @@ def collectCases(opts, langs, reqQ, resQ):
                 'stderr': op.join(opts.dir, exe, '%s.err' % c)})
     return cases
 
+SUPPRESS_TERMCOLOR_DETECTION = False
+
 def colored(s, color):
     if not os.isatty(sys.stdout.fileno()):
         return s
     else:
-        return termcolor.colored(s, color)
+        global SUPPRESS_TERMCOLOR_DETECTION
+        try:
+            import termcolor
+            return termcolor.colored(s, color)
+        except:
+            if not SUPPRESS_TERMCOLOR_DETECTION:
+                print('WARNING: termcolor is not found.')
+                print('Please install termcolor to colorize the output.')
+                print()
+                SUPPRESS_TERMCOLOR_DETECTION = True
+            return s
 
 def filterCases(opts, cases):
     cases = [x for x in cases if not re.search(opts.exclude, x['name'])]
