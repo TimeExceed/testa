@@ -40,7 +40,7 @@ import shlex
 import re
 from functools import partial
 from itertools import groupby
-from datetime import datetime
+from datetime import datetime, timedelta
 import argparse
 
 def countCpu():
@@ -149,6 +149,7 @@ def stopWorkers(reqQ, workers):
         w.join()
 
 def error(msg):
+    print(msg)
     sys.exit(1)
 
 def findMatchLanguage(exe, langs):
@@ -230,23 +231,40 @@ def collectResults(opts, cases, resQ):
     caseNum = len(cases)
     while len(passed) + len(failed) < caseNum:
         res = resQ.get()
+        r = res[2].copy()
+        r['duration'] = res[2]['stop'] - res[2]['start']
+        del r['start']
+        del r['stop']
         if res[0] == kOk:
-            passed.append(res[2])
+            r['result'] = 'PASS'
+            passed.append(r)
             result = colored('pass', 'green')
         elif res[0] == kError:
-            failed.append(res[2])
+            r['result'] = 'FAILED'
+            failed.append(r)
             result = colored('fail', 'red')
         elif res[0] == kTimeout:
-            failed.append(res[2])
+            r['result'] = 'TIMEOUT'
+            failed.append(r)
             result = colored('kill', 'red')
         else:
             error('cancelled')
-        print('%d/%d %s: %s costs %s secs' % (
+        print('%d/%d %s: %s costs %.6f secs' % (
             len(passed) + len(failed), caseNum,
             result,
-            res[1],
-            str(res[2]['stop'] - res[2]['start'])))
+            r['name'],
+            r['duration'].total_seconds()))
     return passed, failed
+
+def report(filename, results):
+    json_res = []
+    for x in results:
+        y = x.copy()
+        y['duration'] = str(x['duration'])
+        json_res.append(y)
+    json_res.sort(key=lambda x:x['name'])
+    with open(filename, 'w') as fp:
+        json.dump(json_res, fp, indent='  ', sort_keys=True)
 
 if __name__ == '__main__':
     opts = parseArgs()
@@ -257,10 +275,14 @@ if __name__ == '__main__':
         cases = collectCases(opts, langs, reqQ, resQ)
         cases = filterCases(opts, cases)
         dispatchCases(cases, reqQ)
-        _, failed = collectResults(opts, cases, resQ)
+        passed, failed = collectResults(opts, cases, resQ)
         print()
         print('%d failed' % len(failed))
         for x in failed:
             print(x['name'])
+        if opts.report:
+            report(opts.report, passed + failed)
+            print()
+            print('save a report to %s' % (opts.report, ))
     finally:
         stopWorkers(reqQ, workers)
