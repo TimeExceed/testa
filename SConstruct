@@ -104,7 +104,7 @@ def parseClojurePackage(src):
 
 def compileClojure(env, workdir, root, cljs, kwargs):
     if cljs:
-        print 'compile clojures in %s into %s' % (root.path, workdir.path)
+        print('compile clojures in %s into %s' % (root.path, workdir.path))
         warnOnReflection = 'true' if kwargs.get('warnOnReflection', False) else 'false'
         subprocess.check_call(['java',
             '-cp', '%s' %
@@ -121,7 +121,7 @@ def compileClojure(env, workdir, root, cljs, kwargs):
 
 def unjar(env, workdir, kwargs):
     for x in kwargs['libs'] + [env['CLOJURE']]:
-        print 'unjar %s into %s' % (x.path, workdir.path)
+        print('unjar %s into %s' % (x.path, workdir.path))
         subprocess.check_call(['jar', 'xf', x.abspath], cwd=workdir.abspath)
 
 def compile(env, workdir, srcDir, kwargs):
@@ -141,7 +141,7 @@ def writeManifest(env, workdir, kwargs):
     return manifestFile
 
 def jar(env, dstJar, workdir, kwargs):
-    print 'jar %s into %s' % (workdir.path, dstJar.path)
+    print('jar %s into %s' % (workdir.path, dstJar.path))
     manifestFile = writeManifest(env, workdir, kwargs)
     tmpJar = env['WORK_DIR'].File('%s.jar' % path.basename(workdir.abspath))
     tmpJar = tmpJar.abspath
@@ -174,7 +174,7 @@ def compileAndJar(env, dstJar, srcDir, **kwargs):
         assert x.exists()
     dstJar = env.File(dstJar)
 
-    workdir = env['WORK_DIR'].Dir(hashlib.md5(dstJar.abspath).hexdigest())
+    workdir = env['WORK_DIR'].Dir(hashlib.md5(dstJar.abspath.encode()).hexdigest())
     if path.exists(workdir.abspath):
         shutil.rmtree(workdir.abspath)
     kwargs['workdir'] = workdir

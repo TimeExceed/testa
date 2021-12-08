@@ -1,6 +1,7 @@
 import argparse
 import sys
 from pathlib import Path
+import json
 
 fixtures = {}
 
@@ -85,8 +86,8 @@ def _parse_args():
 def main():
     action, case = _parse_args()
     if action == 'list':
-        for x in sorted(fixtures.keys()):
-            print(x)
+        res = [{'name': x} for x in sorted(fixtures.keys())]
+        print(json.dumps(res, sort_keys=True, indent=2))
         sys.exit(0)
     elif action == 'case':
         try:

@@ -320,11 +320,14 @@
 (defn main [args cases]
     (cond
         (= args ["--show-cases"]) (do
+            (println "[")
             (->> (for [[cs-name _] cases] cs-name)
                 (sort)
-                (str/join "\n")
+                (map #(format "  {\"name\":\"%s\"}" %))
+                (str/join ",\n")
                 (println)
             )
+            (println "]")
             (System/exit 0)
         )
         (= (count args) 1) (silently-run cases args)

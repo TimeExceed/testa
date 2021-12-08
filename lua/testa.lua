@@ -108,11 +108,15 @@ local function main(tbl)
         printHelp()
         os.exit(0)
     elseif action == 'list' then
+        local res = {}
         for suite, cases in pairs(tbl) do
             for name, func in pairs(cases) do
-                print(string.format('%s.%s', suite, name))
+                table.insert(res, string.format('{"name": "%s.%s"}', suite, name))
             end
         end
+        print('[')
+        print(table.concat(res, ',\n'))
+        print(']')
         os.exit(0)
     elseif action == 'case' then
         local suite, name = string.match(case, '([_%w]+)[.]([_%w]+)')

@@ -90,7 +90,8 @@ main(Args, Cases) ->
                     halt(0);
                 ["--show-cases"] ->
                     Keys = maps:keys(Cases),
-                    io:format("~s~n", [string:join(Keys, "\n")]),
+                    Items = [io_lib:format("{\"name\":\"~s\"}", [X]) || X <- Keys],
+                    io:format("[~n~s~n]~n", [lists:join(",\n", Items)]),
                     halt(0);
                 [Arg] -> 
                     case maps:find(Arg, Cases) of

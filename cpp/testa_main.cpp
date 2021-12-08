@@ -30,6 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "testa.ipp"
+#include <vector>
+#include <algorithm>
 #include <cstdlib>
 #include <cstdio>
 
@@ -66,12 +68,25 @@ int main(int argv, char** args)
         return 0;
     } else if (act == "--show-cases") {
         shared_ptr<testa::CaseMap> caseMap = testa::getCaseMap();
+        vector<string> caseNames;
         for(testa::CaseMap::const_iterator i = caseMap->begin();
             i != caseMap->end();
             ++i)
         {
-            printf("%s\n", i->first.c_str());
+            caseNames.push_back(i->first);
         }
+        sort(caseNames.begin(), caseNames.end());
+        printf("[\n");
+        for(vector<string>::const_iterator i = caseNames.begin();
+            i != caseNames.end();
+            ++i)
+        {
+            if (i != caseNames.begin()) {
+                printf(",\n");
+            }
+            printf("{\"name\":\"%s\"}", i->c_str());
+        }
+        printf("]\n");
         return 0;
     } else {
         shared_ptr<testa::CaseMap> caseMap = testa::getCaseMap();

@@ -186,16 +186,15 @@ def collectCases(opts, langs, reqQ, resQ):
         assert res[0] == kOk, res
         exe = res[1]
         with open(res[2]['stdout']) as f:
-            cs = [x.strip() for x in f]
-        cs = [x for x in cs if x]
+            cs = json.load(f)
         lang = findMatchLanguage(exe, langs)
         for c in cs:
             cases.append({
-                'name': '%s/%s' % (exe, c),
-                'execute': lang['execute'] % {'prog': op.abspath(exe), 'arg': c},
+                'name': '%s/%s' % (exe, c['name']),
+                'execute': lang['execute'] % {'prog': op.abspath(exe), 'arg': c['name']},
                 'cwd': res[2]['cwd'],
-                'stdout': op.join(opts.dir, exe, '%s.out' % c),
-                'stderr': op.join(opts.dir, exe, '%s.err' % c)})
+                'stdout': op.join(opts.dir, exe, '%s.out' % c['name']),
+                'stderr': op.join(opts.dir, exe, '%s.err' % c['name'])})
     return cases
 
 SUPPRESS_TERMCOLOR_DETECTION = False
