@@ -5,6 +5,19 @@ import json
 
 fixtures = {}
 
+class Case:
+    def __init__(self, case_f) -> None:
+        self.case_f = case_f
+        self.is_broken = False
+        self.broken_reason = None
+
+def broken(**kws):
+    def go(cs):
+        cs.is_broken = True
+        assert 'reason' in kws, 'broken case requires a reason'
+        cs.broken_reason = kws['reason']
+    return go
+
 def _is_testbench(trial_f, expect):
     actual = trial_f()
     if actual != expect:
@@ -15,7 +28,9 @@ def is_(**kws):
         global fixtures
         casename = trial_f.__name__
         expect = kws['expect']
-        fixtures[casename] = lambda: _is_testbench(trial_f, expect)
+        res = Case(lambda: _is_testbench(trial_f, expect))
+        fixtures[casename] = res
+        return res
     return go
 
 def _eq_case_f(trial_f, oracle_f, *args):
@@ -34,7 +49,9 @@ def eq(**kws):
         tb = kws['testbench']
         oracle_f = kws['oracle']
         case_f = lambda *args: _eq_case_f(trial_f, oracle_f, *args)
-        fixtures[casename] = lambda: tb(case_f)
+        res = Case(lambda: tb(case_f))
+        fixtures[casename] = res
+        return res
     return go
 
 def _verify_case_f(trial_f, verifier, *args):
@@ -50,7 +67,9 @@ def verify(**kws):
         tb = kws['testbench']
         trial_f = kws['trial']
         case_f = lambda *args: _verify_case_f(trial_f, verifier_f, *args)
-        fixtures[casename] = lambda: tb(case_f)
+        res = Case(lambda: tb(case_f))
+        fixtures[casename] = res
+        return res
     return go
 
 def _throws_tb(trial_f, expect_except):
@@ -66,7 +85,9 @@ def throw(**kws):
         global fixtures
         casename = trial_f.__name__
         expect_throw = kws['throw']
-        fixtures[casename] = lambda: _throws_tb(trial_f, expect_throw)
+        res = Case(lambda: _throws_tb(trial_f, expect_throw))
+        fixtures[casename] = res
+        return res
     return go
 
 def _parse_args():
@@ -84,14 +105,20 @@ def _parse_args():
         return 'case', args.casename
 
 def main():
+    global fixtures
     action, case = _parse_args()
     if action == 'list':
         res = [{'name': x} for x in sorted(fixtures.keys())]
+        for x in res:
+            cs = fixtures[x['name']]
+            if cs.is_broken:
+                x['broken'] = True
+                x['broken_reason'] = cs.broken_reason
         print(json.dumps(res, sort_keys=True, indent=2))
         sys.exit(0)
     elif action == 'case':
         try:
-            t = fixtures[case]
+            t = fixtures[case].case_f
         except KeyError:
             print('unknown case:', case)
             sys.exit(1)

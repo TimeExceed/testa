@@ -93,6 +93,7 @@ kOk = 'OK'
 kError = 'Error'
 kTimeout = 'Timeout'
 kCancel = 'Cancel'
+kSkip = 'Skip'
 
 gCancelled = False
 
@@ -108,6 +109,10 @@ def work(opts, qin, qout):
             args = shlex.split(cs['execute'])
             kws = {}
             with open(cs['stdout'], 'wb') as stdout, open(cs['stderr'], 'wb') as stderr:
+                if cs.get('broken', False):
+                    stdout.write(cs['broken-reason'].encode())
+                    qout.put([kSkip, cs['name'], cs])
+                    break
                 kws['stdout'] = stdout
                 kws['stderr'] = stderr
                 kws['check'] = True
@@ -189,12 +194,17 @@ def collectCases(opts, langs, reqQ, resQ):
             cs = json.load(f)
         lang = findMatchLanguage(exe, langs)
         for c in cs:
-            cases.append({
+            x = {
                 'name': '%s/%s' % (exe, c['name']),
+                'broken': c.get('broken', False),
                 'execute': lang['execute'] % {'prog': op.abspath(exe), 'arg': c['name']},
                 'cwd': res[2]['cwd'],
                 'stdout': op.join(opts.dir, exe, '%s.out' % c['name']),
-                'stderr': op.join(opts.dir, exe, '%s.err' % c['name'])})
+                'stderr': op.join(opts.dir, exe, '%s.err' % c['name']),
+            }
+            if x['broken']:
+                x['broken-reason'] = c['broken_reason']
+            cases.append(x)
     return cases
 
 SUPPRESS_TERMCOLOR_DETECTION = False
@@ -231,23 +241,29 @@ def collectResults(opts, cases, resQ):
     while len(passed) + len(failed) < caseNum:
         res = resQ.get()
         r = res[2].copy()
-        r['duration'] = res[2]['stop'] - res[2]['start']
-        del r['start']
-        del r['stop']
-        if res[0] == kOk:
-            r['result'] = 'PASS'
+        if res[0] == kSkip:
+            r['result'] = 'SKIP'
+            r['duration'] = timedelta()
             passed.append(r)
-            result = colored('pass', 'green')
-        elif res[0] == kError:
-            r['result'] = 'FAILED'
-            failed.append(r)
-            result = colored('fail', 'red')
-        elif res[0] == kTimeout:
-            r['result'] = 'TIMEOUT'
-            failed.append(r)
-            result = colored('kill', 'red')
+            result = colored('skip', 'blue')
         else:
-            error('cancelled')
+            r['duration'] = res[2]['stop'] - res[2]['start']
+            del r['start']
+            del r['stop']
+            if res[0] == kOk:
+                r['result'] = 'PASS'
+                passed.append(r)
+                result = colored('pass', 'green')
+            elif res[0] == kError:
+                r['result'] = 'FAILED'
+                failed.append(r)
+                result = colored('fail', 'red')
+            elif res[0] == kTimeout:
+                r['result'] = 'TIMEOUT'
+                failed.append(r)
+                result = colored('kill', 'red')
+            else:
+                error('cancelled')
         print('%d/%d %s: %s costs %.6f secs' % (
             len(passed) + len(failed), caseNum,
             result,

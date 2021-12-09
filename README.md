@@ -381,6 +381,36 @@ def throw_wrong():
     empty['xxx']
 ```
 
+#### testa.broken
+
+We also can mark cases as broken ones for some reasons.
+
+```python
+@testa.broken(reason = 'this is a broken case.')
+@testa.is_(expect=3)
+def broken_addition():
+    return 2 + 2
+
+@testa.broken(reason = 'this is a broken case.')
+@testa.eq(testbench=multiple_tb, oracle=multiple_oracle)
+def broken_multiple(x, y):
+    return x + y
+
+@testa.broken(reason = 'this is a broken case.')
+@testa.verify(testbench=gcd_tb, trial=gcd)
+def broken_verifier(result, a, b):
+    if a == 0 and b == 0:
+        return 'undefined on (0, 0)'
+    if a == 1:
+        return 'fake error on a=1'
+
+@testa.broken(reason = 'this is a broken case.')
+@testa.throw(throw=IOError)
+def broken_throw():
+    empty = {}
+    empty['xxx']
+```
+
 ## How to run tests
 
 Here are some examples.
