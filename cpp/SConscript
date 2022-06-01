@@ -26,3 +26,16 @@ if 'cpp11' in ARGUMENTS.get('mode', '').split(','):
                   env11.Object(['testa11.cpp', 'prettyprint11.cpp',
                                 'testa_main11.cpp',
                                 'pp11_unittest.cpp', 'testa11_unittest.cpp']))
+
+if 'cpp17' in ARGUMENTS.get('mode', '').split(','):
+    env17 = env.Clone()
+    env17.MergeFlags({'CXXFLAGS': ['--std=c++17']})
+    env17.InstallAs('testa17.cpp', 'testa.cpp')
+    env17.InstallAs('prettyprint17.cpp', 'prettyprint.cpp')
+    env17.InstallAs('pp17_unittest.cpp', 'pp_unittest.cpp')
+    env17.InstallAs('testa17_unittest.cpp', 'testa_unittest.cpp')
+    env17.InstallAs('testa_main17.cpp', 'testa_main.cpp')
+    env17.Program('cpp17_unittest',
+                  env17.Object(['testa17.cpp', 'prettyprint17.cpp',
+                                'testa_main17.cpp',
+                                'pp17_unittest.cpp', 'testa17_unittest.cpp']))

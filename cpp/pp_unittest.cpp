@@ -6,6 +6,9 @@
 #else
 #include <tuple>
 #endif
+#if __cplusplus >= 201703L
+#include <optional>
+#endif
 
 #include <limits>
 #include <cstdio>
@@ -83,7 +86,7 @@ void signed_integers(const string&)
         (max)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(SignedIntegers, signed_integers); 
+TESTA_DEF_JUNIT_LIKE2(SignedIntegers, signed_integers);
 
 void unsigned_integers(const string&)
 {
@@ -107,7 +110,7 @@ void unsigned_integers(const string&)
         (max)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(UnsignedIntegers, unsigned_integers); 
+TESTA_DEF_JUNIT_LIKE2(UnsignedIntegers, unsigned_integers);
 
 void booleans(const string&)
 {
@@ -138,3 +141,34 @@ void floatings(const string&)
         .issue();
 }
 TESTA_DEF_JUNIT_LIKE2(Floatings, floatings);
+
+void literal_str(const string&)
+{
+    string res = pp::prettyPrint("abc");
+    TESTA_ASSERT(res == "abc")
+        (res)
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(LiteralStr, literal_str);
+
+#if __cplusplus >= 201703L
+void optional_none(const string&)
+{
+    optional<int> none{};
+    string res = pp::prettyPrint(none);
+    TESTA_ASSERT(res == "None")
+        (res)
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(OptionalNone, optional_none);
+
+void optional_just(const string&)
+{
+    optional<int> just{1};
+    string res = pp::prettyPrint(just);
+    TESTA_ASSERT(res == "Just(1)")
+        (res)
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(OptionalJust, optional_just);
+#endif

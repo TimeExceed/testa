@@ -41,6 +41,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tuple>
 #include <cstdint>
 #endif
+#if __cplusplus >= 201703L
+#include <optional>
+#endif
 
 namespace pp {
 namespace impl {
@@ -366,6 +369,23 @@ struct PrettyPrinter<const char*, void>
         out.append(cs);
     }
 };
+
+#if __cplusplus >= 201703L
+template<class T>
+struct PrettyPrinter<std::optional<T>, void>
+{
+    void operator()(std::string& out, const std::optional<T>& xs) const
+    {
+        if(xs.has_value()) {
+            out.append("Just(");
+            prettyPrint(out, xs.value());
+            out.append(")");
+        } else {
+            out.append("None");
+        }
+    }
+};
+#endif
 
 } // namespace impl
 } // namespace pp
