@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <deque>
 #include <cstdlib>
-    
+
 #if __cplusplus < 201103L
 #include <tr1/tuple>
 #include <stdint.h>
@@ -345,7 +345,16 @@ struct PrettyPrinter<const char[n], void>
 {
     void operator()(std::string& out, const char* cs) const
     {
-        out.append(cs, n);
+        out.append(cs, n - 1);
+    }
+};
+
+template<int n>
+struct PrettyPrinter<char[n], void>
+{
+    void operator()(std::string& out, const char* cs) const
+    {
+        out.append(cs, n - 1);
     }
 };
 
