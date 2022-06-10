@@ -93,5 +93,11 @@ def broken_throw():
     empty = {}
     empty['xxx']
 
+
+@testa.is_(expect=None)
+def sleep_case():
+    from time import sleep
+    sleep(3)
+
 if __name__ == '__main__':
     testa.main()

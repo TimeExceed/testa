@@ -64,8 +64,8 @@ def parseArgs():
                         help='A regular expression. Only test cases matching this pattern will be run. [default: ".*"]')
     parser.add_argument('-e', '--exclude', nargs='?', default='^$',
                         help='A regular expression. Test cases matching this pattern will not be run. [default: "^$"]')
-    parser.add_argument('--timeout', nargs='?',
-                        help='how long a case is allowed to run (in msec) [default: disable]')
+    parser.add_argument('--timeout', nargs='?', type=int,
+                        help='how long a case is allowed to run (in sec) [default: disable]')
     parser.add_argument('--report', nargs='?',
                         help='report as a json file')
     args = parser.parse_args()
@@ -117,8 +117,8 @@ def work(opts, qin, qout):
                 kws['stderr'] = stderr
                 kws['check'] = True
                 kws['cwd'] = cs['cwd']
-                if opts.timeout:
-                    kws['timeout'] = opts.timeout / 1000
+                if opts.timeout and not cs.get('suppress_timeout', False):
+                    kws['timeout'] = opts.timeout
                 cs['start'] = datetime.utcnow()
                 try:
                     subprocess.run(args, **kws)
@@ -181,7 +181,8 @@ def collectCases(opts, langs, reqQ, resQ):
             'execute': exeArgs,
             'cwd': progDir,
             'stdout': op.join(testDir, 'cases.out'),
-            'stderr': op.join(testDir, 'cases.err')})
+            'stderr': op.join(testDir, 'cases.err'),
+            'suppress_timeout': True})
     for e in exes:
         reqQ.put(e)
 
@@ -295,6 +296,8 @@ if __name__ == '__main__':
         print('%d failed' % len(failed))
         for x in failed:
             print(x['name'])
+            print('  stdout:', x['stdout'])
+            print('  stderr:', x['stderr'])
         if opts.report:
             report(opts.report, passed + failed)
             print()
