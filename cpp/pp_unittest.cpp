@@ -172,3 +172,33 @@ void optional_just(const string&)
 }
 TESTA_DEF_JUNIT_LIKE2(OptionalJust, optional_just);
 #endif
+
+void complex_positive_imag(const string&)
+{
+    complex<double> c(1, 2);
+    string res = pp::prettyPrint(c);
+    TESTA_ASSERT(res == "1.0000+2.0000i")
+        (res)
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(ComplexPositiveImag, complex_positive_imag);
+
+void complex_negative_imag(const string&)
+{
+    complex<double> c(1, -2);
+    string res = pp::prettyPrint(c);
+    TESTA_ASSERT(res == "1.0000-2.0000i")
+        (res)
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(ComplexNegativeImag, complex_negative_imag);
+
+void complex_real_zero(const string&)
+{
+    complex<double> c;
+    string res = pp::prettyPrint(c);
+    TESTA_ASSERT(res == "0.0000+0.0000i")
+        (res)
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(ComplexRealZero, complex_real_zero);

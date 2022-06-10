@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <deque>
 #include <cstdlib>
+#include <complex>
 
 #if __cplusplus < 201103L
 #include <tr1/tuple>
@@ -386,6 +387,20 @@ struct PrettyPrinter<std::optional<T>, void>
     }
 };
 #endif
+
+template<class Float>
+struct PrettyPrinter<std::complex<Float>, void>
+{
+    void operator()(std::string& out, const std::complex<Float>& in) const
+    {
+        pp::prettyPrint(out, in.real());
+        if (in.imag() >= 0) {
+            out.push_back('+');
+        }
+        pp::prettyPrint(out, in.imag());
+        out.push_back('i');
+    }
+};
 
 } // namespace impl
 } // namespace pp
