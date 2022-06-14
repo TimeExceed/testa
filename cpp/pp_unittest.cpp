@@ -29,7 +29,7 @@ void junit_style_deque(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(JunitStyleDeque, junit_style_deque);
+TESTA_DEF_JUNIT_LIKE2(PP_JunitStyleDeque, junit_style_deque);
 
 void junit_style_map(const string&)
 {
@@ -42,7 +42,7 @@ void junit_style_map(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(JunitStyleMap, junit_style_map);
+TESTA_DEF_JUNIT_LIKE2(PP_JunitStyleMap, junit_style_map);
 
 void tp0(const string&)
 {
@@ -52,7 +52,7 @@ void tp0(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(Tuple0, tp0);
+TESTA_DEF_JUNIT_LIKE2(PP_Tuple0, tp0);
 
 void tp1(const string&)
 {
@@ -62,7 +62,7 @@ void tp1(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(Tuple1, tp1);
+TESTA_DEF_JUNIT_LIKE2(PP_Tuple1, tp1);
 
 void signed_integers(const string&)
 {
@@ -86,7 +86,7 @@ void signed_integers(const string&)
         (max)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(SignedIntegers, signed_integers);
+TESTA_DEF_JUNIT_LIKE2(PP_SignedIntegers, signed_integers);
 
 void unsigned_integers(const string&)
 {
@@ -110,7 +110,7 @@ void unsigned_integers(const string&)
         (max)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(UnsignedIntegers, unsigned_integers);
+TESTA_DEF_JUNIT_LIKE2(PP_UnsignedIntegers, unsigned_integers);
 
 void booleans(const string&)
 {
@@ -120,7 +120,7 @@ void booleans(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(Booleans, booleans);
+TESTA_DEF_JUNIT_LIKE2(PP_Booleans, booleans);
 
 void characters(const string&)
 {
@@ -130,9 +130,10 @@ void characters(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(Characters, characters);
+TESTA_DEF_JUNIT_LIKE2(PP_Characters, characters);
 
-void floatings(const string&)
+namespace {
+void fpnumber(const string&)
 {
     tuple<float, double> tp(1.0, 2.0);
     string res = pp::prettyPrint(tp);
@@ -140,7 +141,8 @@ void floatings(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(Floatings, floatings);
+} // namespace
+TESTA_DEF_JUNIT_LIKE2(PP_FloatPointNumber, fpnumber);
 
 void literal_str(const string&)
 {
@@ -149,7 +151,7 @@ void literal_str(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(LiteralStr, literal_str);
+TESTA_DEF_JUNIT_LIKE2(PP_LiteralStr, literal_str);
 
 #if __cplusplus >= 201703L
 void optional_none(const string&)
@@ -160,7 +162,7 @@ void optional_none(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(OptionalNone, optional_none);
+TESTA_DEF_JUNIT_LIKE2(PP_OptionalNone, optional_none);
 
 void optional_just(const string&)
 {
@@ -170,7 +172,7 @@ void optional_just(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(OptionalJust, optional_just);
+TESTA_DEF_JUNIT_LIKE2(PP_OptionalJust, optional_just);
 #endif
 
 void complex_positive_imag(const string&)
@@ -181,7 +183,7 @@ void complex_positive_imag(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(ComplexPositiveImag, complex_positive_imag);
+TESTA_DEF_JUNIT_LIKE2(PP_ComplexPositiveImag, complex_positive_imag);
 
 void complex_negative_imag(const string&)
 {
@@ -191,7 +193,7 @@ void complex_negative_imag(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(ComplexNegativeImag, complex_negative_imag);
+TESTA_DEF_JUNIT_LIKE2(PP_ComplexNegativeImag, complex_negative_imag);
 
 void complex_real_zero(const string&)
 {
@@ -201,4 +203,4 @@ void complex_real_zero(const string&)
         (res)
         .issue();
 }
-TESTA_DEF_JUNIT_LIKE2(ComplexRealZero, complex_real_zero);
+TESTA_DEF_JUNIT_LIKE2(PP_ComplexRealZero, complex_real_zero);
