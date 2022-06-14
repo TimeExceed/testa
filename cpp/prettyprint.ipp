@@ -174,11 +174,6 @@ struct PrettyPrinter<
     };
 };
 
-struct Floating
-{
-    static void p(std::string&, double);
-};
-
 template<class T>
 struct PrettyPrinter<
     T,
@@ -186,7 +181,8 @@ struct PrettyPrinter<
 {
     void operator()(std::string& out, T x) const
     {
-        Floating::p(out, x);
+        FloatPointPrettyPrinter pp(x);
+        pp.prettyPrint(out);
     }
 };
 

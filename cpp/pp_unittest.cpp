@@ -10,8 +10,11 @@
 #include <optional>
 #endif
 
+#include <sstream>
+#include <iomanip>
 #include <limits>
 #include <cstdio>
+#include <cmath>
 
 using namespace std;
 #if __cplusplus < 201103L
@@ -133,7 +136,7 @@ void characters(const string&)
 TESTA_DEF_JUNIT_LIKE2(PP_Characters, characters);
 
 namespace {
-void fpnumber(const string&)
+void fp_normal(const string&)
 {
     tuple<float, double> tp(1.0, 2.0);
     string res = pp::prettyPrint(tp);
@@ -142,7 +145,69 @@ void fpnumber(const string&)
         .issue();
 }
 } // namespace
-TESTA_DEF_JUNIT_LIKE2(PP_FloatPointNumber, fpnumber);
+TESTA_DEF_JUNIT_LIKE2(PP_FloatPointNumber, fp_normal);
+
+namespace {
+void fp_nan(const string&)
+{
+    float fnan = NAN;
+    TESTA_ASSERT(pp::prettyPrint(fnan) == "NaN")
+        (fnan)
+        .issue();
+    double dnan = NAN;
+    TESTA_ASSERT(pp::prettyPrint(dnan) == "NaN")
+        (dnan)
+        .issue();
+}
+} // namespace
+TESTA_DEF_JUNIT_LIKE2(PP_FloatPointNumber_NaN, fp_nan);
+
+namespace {
+void fp_inf(const string&)
+{
+    float pfinf = INFINITY;
+    float nfinf = -INFINITY;
+    double pdinf = INFINITY;
+    double ndinf = -INFINITY;
+    TESTA_ASSERT(pp::prettyPrint(pfinf) == "+inf")
+        (pfinf)
+        .issue();
+    TESTA_ASSERT(pp::prettyPrint(nfinf) == "-inf")
+        (nfinf)
+        .issue();
+    TESTA_ASSERT(pp::prettyPrint(pdinf) == "+inf")
+        (pdinf)
+        .issue();
+    TESTA_ASSERT(pp::prettyPrint(ndinf) == "-inf")
+        (ndinf)
+        .issue();
+}
+} // namespace
+TESTA_DEF_JUNIT_LIKE2(PP_FloatPointNumber_Inf, fp_inf);
+
+namespace {
+void fp_tb(const string&, function<void(const double&)> cs)
+{
+    for(int64_t i = -100000; i < 100000; ++i) {
+        double n = i;
+        n /= 1000;
+        cs(n);
+    }
+}
+string fp_trial(const double& x)
+{
+    pp::FloatPointPrettyPrinter fp(x, 3);
+    return pp::prettyPrint(fp);
+}
+string fp_oralce(const double& x)
+{
+    ostringstream oss;
+    oss.setf(ios_base::fixed);
+    oss << setprecision(3) << x;
+    return oss.str();
+}
+} // namespace
+TESTA_DEF_EQ_WITH_TB(PP_FloatPointNumber_exhaustive, fp_tb, fp_trial, fp_oralce);
 
 void literal_str(const string&)
 {

@@ -1,3 +1,4 @@
+#pragma once
 /*
 This file is picked from project testa [https://github.com/TimeExceed/testa.git]
 Copyright (c) 2017, Taoda (tyf00@aliyun.com)
@@ -29,7 +30,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#pragma once
 #ifndef TABLESTORE_UTIL_PRETTYPRINT_HPP
 #define TABLESTORE_UTIL_PRETTYPRINT_HPP
 
@@ -59,6 +59,16 @@ std::string prettyPrint(const T& x)
     prettyPrint<T>(res, x);
     return res;
 }
+
+struct FloatPointPrettyPrinter
+{
+    explicit FloatPointPrettyPrinter(double v, size_t prec = 4);
+    void prettyPrint(std::string&) const;
+
+private:
+    double mValue;
+    size_t mPrec;
+};
 
 } // namespace pp
 
