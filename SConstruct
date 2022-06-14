@@ -196,7 +196,7 @@ def compileAndJar(env, dstJar, srcDir, **kwargs):
 env.AddMethod(compileAndJar)
 
 flags = {
-    'CFLAGS': [], 
+    'CFLAGS': [],
     'CXXFLAGS': [], #'--std=c++11'
     'CCFLAGS': ['-Wall', '-Wfloat-equal',
                 '-O0', '--coverage', '-fsanitize=address', '-fvar-tracking-assignments',
