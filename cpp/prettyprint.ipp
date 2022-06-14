@@ -36,9 +36,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <complex>
 
 #if __cplusplus < 201103L
+#include <tr1/functional>
 #include <tr1/tuple>
 #include <stdint.h>
 #else
+#include <functional>
 #include <tuple>
 #include <cstdint>
 #endif
@@ -395,6 +397,28 @@ struct PrettyPrinter<std::complex<Float>, void>
         }
         pp::prettyPrint(out, in.imag());
         out.push_back('i');
+    }
+};
+
+template<class T>
+struct PrettyPrinter<
+#if __cplusplus < 201103L
+    std::tr1::reference_wrapper<T>,
+#else
+    std::reference_wrapper<T>,
+#endif
+    void>
+{
+    void operator()(std::string& out,
+#if __cplusplus < 201103L
+    std::tr1::reference_wrapper<T> x
+#else
+    std::reference_wrapper<T> x
+#endif
+    ) const
+    {
+        out.push_back('&');
+        pp::prettyPrint(out, x.get());
     }
 };
 

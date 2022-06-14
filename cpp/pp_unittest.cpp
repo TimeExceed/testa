@@ -2,8 +2,10 @@
 #include "prettyprint.hpp"
 
 #if __cplusplus < 201103L
+#include <tr1/functional>
 #include <tr1/tuple>
 #else
+#include <functional>
 #include <tuple>
 #endif
 #if __cplusplus >= 201703L
@@ -269,3 +271,15 @@ void complex_real_zero(const string&)
         .issue();
 }
 TESTA_DEF_JUNIT_LIKE2(PP_ComplexRealZero, complex_real_zero);
+
+namespace {
+void reference_wrapper_(const string&)
+{
+    int x = 0;
+    reference_wrapper<int> rx(x);
+    TESTA_ASSERT(pp::prettyPrint(rx) == "&0")
+        (rx)
+        .issue();
+}
+} // namespace
+TESTA_DEF_JUNIT_LIKE2(PP_RefWrap, reference_wrapper_);
