@@ -1,3 +1,4 @@
+#pragma once
 /*
 This file is picked from project testa [https://github.com/TimeExceed/testa.git]
 Copyright (c) 2017, Taoda (tyf00@aliyun.com)
@@ -29,33 +30,26 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#pragma once
-
-#include "prettyprint.hpp"
-
-#if __cplusplus < 201103L
-#include <tr1/memory>
-#include <tr1/functional>
-#include <tr1/tuple>
-#else
+#include <string_view>
 #include <memory>
 #include <functional>
 #include <tuple>
-#endif
-
 #include <deque>
 #include <map>
 #include <string>
 
+#ifdef ENABLE_STD_FORMAT
+#include <format>
+#endif
+#ifdef ENABLE_FMTLIB
+#include <fmt/core.h>
+#endif
+
 namespace testa {
 
-#if __cplusplus < 201103L
-typedef ::std::map<std::string, std::tr1::function<void()> > CaseMap;
-std::tr1::shared_ptr<CaseMap> getCaseMap();
-#else
-typedef ::std::map<std::string, std::function<void()> > CaseMap;
-std::shared_ptr<CaseMap> getCaseMap();
-#endif
+using CaseMap = ::std::map<::std::string, ::std::function<void()> >;
+
+::std::shared_ptr<CaseMap> getCaseMap();
 
 class CaseFailIssuer
 {
@@ -63,22 +57,32 @@ public:
     explicit CaseFailIssuer(bool disable, const char* cond, const char* fn, int line);
     ~CaseFailIssuer();
 
-    CaseFailIssuer& append(const std::string& key, const std::string& value);
-    void issue(const std::string& msg);
-    void issue();
-    
-private:
-#if __cplusplus < 201103L
-    typedef std::tr1::tuple<std::string, std::string> KV;
-#else
-    typedef std::tuple<std::string, std::string> KV;
+    template<class... Args>
+    requires (sizeof...(Args) > 0)
+    CaseFailIssuer& append(::std::string_view fmt, Args&&... args) {
+#ifdef ENABLE_STD_FORMAT
+        mHints.push_back(::std::vformat(fmt, ::std::make_format_args(args...)));
 #endif
+#ifdef ENABLE_FMTLIB
+        mHints.push_back(::fmt::vformat(fmt, ::fmt::make_format_args(args...)));
+#endif
+        return *this;
+    }
 
+    CaseFailIssuer& append(::std::string hint) {
+        mHints.push_back(::std::move(hint));
+        return *this;
+    }
+
+    void issue(const ::std::string_view& msg);
+    void issue();
+
+private:
     bool mTrigger;
-    std::string mCondition;
-    std::string mFilename;
+    ::std::string mCondition;
+    ::std::string mFilename;
     int mLine;
-    std::deque<KV> mKeyValues;
+    ::std::deque<::std::string> mHints;
     bool mIssued;
 
 public:
@@ -91,30 +95,17 @@ class EqCase
 public:
     template<class Res, class T>
     EqCase(
-        const std::string& caseName,
-#if __cplusplus < 201103L
-        void (*tb)(const std::string&, std::tr1::function<void(const T&)>),
-#else
-        void (*tb)(const std::string&, std::function<void(const T&)>),
-#endif
+        const ::std::string& caseName,
+        void (*tb)(const ::std::string&, ::std::function<void(const T&)>),
         Res (*trialFn)(const T&),
-        Res (*oracleFn)(const T&))
-    {
-#if __cplusplus < 201103L
-        std::tr1::function<void(T)> cs = std::tr1::bind(
-#else
-        std::function<void(T)> cs = std::bind(
-#endif
+        Res (*oracleFn)(const T&)
+    ) {
+        ::std::function<void(T)> cs = ::std::bind(
             &EqCase::eq<Res, T>,
             trialFn,
             oracleFn,
-#if __cplusplus < 201103L
-            std::tr1::placeholders::_1);
-        (*testa::getCaseMap())[caseName] = std::tr1::bind(tb, caseName, cs); 
-#else
-            std::placeholders::_1);
-        (*testa::getCaseMap())[caseName] = std::bind(tb, caseName, cs); 
-#endif
+            ::std::placeholders::_1);
+        (*testa::getCaseMap())[caseName] = ::std::bind(tb, caseName, cs);
     }
 
     template<class Res, class T>
@@ -122,13 +113,9 @@ public:
         const std::string& caseName,
         Res (*trialFn)(const T&),
         Res (*oracleFn)(const T&),
-        const T& in)
-    {
-#if __cplusplus < 201103L
-        std::tr1::function<void()> cs = std::tr1::bind(
-#else
-        std::function<void()> cs = std::bind(
-#endif
+        const T& in
+    ) {
+        ::std::function<void()> cs = ::std::bind(
             &EqCase::eq<Res, T>,
             trialFn,
             oracleFn,
@@ -138,62 +125,34 @@ public:
 
     template<class Res, class T0, class T1>
     EqCase(
-        const std::string& caseName,
-#if __cplusplus < 201103L
-        Res (*trialFn)(const std::tr1::tuple<T0, T1>&),
-        Res (*oracleFn)(const std::tr1::tuple<T0, T1>&),
-#else
-        Res (*trialFn)(const std::tuple<T0, T1>&),
-        Res (*oracleFn)(const std::tuple<T0, T1>&),
-#endif
+        const ::std::string& caseName,
+        Res (*trialFn)(const ::std::tuple<T0, T1>&),
+        Res (*oracleFn)(const ::std::tuple<T0, T1>&),
         const T0& in0,
-        const T1& in1)
-    {
-#if __cplusplus < 201103L
-        std::tr1::function<void()> cs = std::tr1::bind(
-            &EqCase::eq<Res, std::tr1::tuple<T0, T1> >,
-#else
-        std::function<void()> cs = std::bind(
-            &EqCase::eq<Res, std::tuple<T0, T1> >,
-#endif
+        const T1& in1
+    ) {
+        ::std::function<void()> cs = ::std::bind(
+            &EqCase::eq<Res, ::std::tuple<T0, T1> >,
             trialFn,
             oracleFn,
-#if __cplusplus < 201103L
-            std::tr1::make_tuple(in0, in1));
-#else
-            std::make_tuple(in0, in1));
-#endif
+            ::std::make_tuple(in0, in1));
         (*testa::getCaseMap())[caseName] = cs;
     }
 
     template<class Res, class T0, class T1, class T2>
     EqCase(
-        const std::string& caseName,
-#if __cplusplus < 201103L
-        Res (*trialFn)(const std::tr1::tuple<T0, T1, T2>&),
-        Res (*oracleFn)(const std::tr1::tuple<T0, T1, T2>&),
-#else
-        Res (*trialFn)(const std::tuple<T0, T1, T2>&),
-        Res (*oracleFn)(const std::tuple<T0, T1, T2>&),
-#endif
+        const ::std::string& caseName,
+        Res (*trialFn)(const ::std::tuple<T0, T1, T2>&),
+        Res (*oracleFn)(const ::std::tuple<T0, T1, T2>&),
         const T0& in0,
         const T1& in1,
-        const T2& in2)
-    {
-#if __cplusplus < 201103L
-        std::tr1::function<void()> cs = std::tr1::bind(
-            &EqCase::eq<Res, std::tr1::tuple<T0, T1, T2> >,
-#else
-        std::function<void()> cs = std::bind(
-            &EqCase::eq<Res, std::tuple<T0, T1, T2> >,
-#endif
+        const T2& in2
+    ) {
+        ::std::function<void()> cs = ::std::bind(
+            &EqCase::eq<Res, ::std::tuple<T0, T1, T2> >,
             trialFn,
             oracleFn,
-#if __cplusplus < 201103L
-            std::tr1::make_tuple(in0, in1, in2));
-#else
-            std::make_tuple(in0, in1, in2));
-#endif
+            ::std::make_tuple(in0, in1, in2));
         (*testa::getCaseMap())[caseName] = cs;
     }
 
@@ -202,16 +161,16 @@ private:
     static void eq(
         Res (*trialFn)(const T&),
         Res (*oracleFn)(const T&),
-        const T& in)
-    {
+        const T& in
+    ) {
         const Res& trialResult = trialFn(in);
         const Res& oracleResult = oracleFn(in);
         CaseFailIssuer issr(trialResult == oracleResult,
-            "trialResult == oracleResult",
+            "trial result == oracle result",
             __FILE__, __LINE__);
-        issr.append("input", pp::prettyPrint(in))
-            .append("trialResult", pp::prettyPrint(trialResult))
-            .append("oracleResult", pp::prettyPrint(oracleResult))
+        issr.append("input={}", in)
+            .append("trial result={}", trialResult)
+            .append("oracle result={}", oracleResult)
             .issue();
     }
 };
@@ -221,41 +180,24 @@ class VerifyCase
 public:
     template<class Res, class T>
     VerifyCase(
-        const std::string& caseName,
-#if __cplusplus < 201103L
-        void (*tb)(const std::string&, std::tr1::function<void(const T&)>),
-#else
-        void (*tb)(const std::string&, std::function<void(const T&)>),
-#endif
+        const ::std::string& caseName,
+        void (*tb)(const ::std::string&, ::std::function<void(const T&)>),
         void (*verifier)(const Res&, const T&),
-        Res (*trialFn)(const T&))
-    {
-#if __cplusplus < 201103L
-        std::tr1::function<void(T)> cs = std::tr1::bind(
-#else
-        std::function<void(T)> cs = std::bind(
-#endif
+        Res (*trialFn)(const T&)
+    ) {
+        ::std::function<void(T)> cs = ::std::bind(
             &VerifyCase::verify<Res, T>,
             verifier,
             trialFn,
-#if __cplusplus < 201103L
-            std::tr1::placeholders::_1);
-        (*testa::getCaseMap())[caseName] = std::tr1::bind(tb, caseName, cs);
-#else
-            std::placeholders::_1);
-        (*testa::getCaseMap())[caseName] = std::bind(tb, caseName, cs);
-#endif
+            ::std::placeholders::_1);
+        (*testa::getCaseMap())[caseName] = ::std::bind(tb, caseName, cs);
     }
 
     VerifyCase(
-        const std::string& caseName,
-        void (*tbVerifier)(const std::string&))
-    {
-#if __cplusplus < 201103L
-        (*testa::getCaseMap())[caseName] = std::tr1::bind(tbVerifier, caseName);
-#else
-        (*testa::getCaseMap())[caseName] = std::bind(tbVerifier, caseName);
-#endif
+        const ::std::string& caseName,
+        void (*tbVerifier)(const std::string&)
+    ) {
+        (*testa::getCaseMap())[caseName] = ::std::bind(tbVerifier, caseName);
     }
 
 private:
@@ -263,8 +205,8 @@ private:
     static void verify(
         void (*verifier)(const Res&, const T&),
         Res (*trialFn)(const T&),
-        const T& in)
-    {
+        const T& in
+    ) {
         const Res& res = trialFn(in);
         verifier(res, in);
     }

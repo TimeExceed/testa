@@ -1,21 +1,52 @@
 #include "testa.hpp"
 #include "prettyprint.hpp"
-
-#if __cplusplus < 201103L
-#include <tr1/type_traits>
-#include <tr1/tuple>
-#else
-#include <type_traits>
 #include <tuple>
-#endif
-
-#include <limits>
-#include <cstdio>
+#include <string>
+#include <functional>
 
 using namespace std;
-#if __cplusplus < 201103L
-using namespace std::tr1;
+
+void junit_like1_correct(const string&) {
+    TESTA_ASSERT(true)
+        ("Hello World!")
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE1(junit_like1_correct);
+
+void junit_like1_wrong(const string&) {
+    TESTA_ASSERT(false)
+        ("Hello World!")
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE1(junit_like1_wrong);
+
+void junit_like2_correct_orig(const string&) {
+    TESTA_ASSERT(true)
+        ("Hello World!")
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(junit_like2_correct, junit_like2_correct_orig);
+
+void junit_like2_wrong_orig(const string&) {
+    TESTA_ASSERT(false)
+        ("Hello World!")
+        .issue();
+}
+TESTA_DEF_JUNIT_LIKE2(junit_like2_wrong, junit_like2_wrong_orig);
+
+void invocable_hints(const string&) {
+#ifdef ENABLE_STD_FORMAT
+    TESTA_ASSERT(true)
+        (std::format("Hello {}!", "World"))
+        .issue();
 #endif
+#ifdef ENABLE_FMTLIB
+    TESTA_ASSERT(true)
+        (fmt::format("Hello {}!", "World"))
+        .issue();
+#endif
+}
+TESTA_DEF_JUNIT_LIKE1(invocable_hints);
 
 int add_trial(const tuple<int, int>& in)
 {
@@ -74,16 +105,16 @@ void gcd_tb(const string& name, function<void(const tuple<int, int>&)> cs)
 void gcd_verifier(const int& res, const tuple<int, int>& in)
 {
     TESTA_ASSERT(get<0>(in) % res == 0 && get<1>(in) % res == 0)
-        (res)
-        (in)
+        ("res={}", res)
+        ("in=({})", in)
         .issue();
 }
 
 void gcd_wrong_verifier(const int& res, const tuple<int, int>& in)
 {
     TESTA_ASSERT(get<0>(in) % res != 0)
-        (res)
-        (in)
+        ("res={}", res)
+        ("in=({})", in)
         .issue();
 }
 

@@ -1,3 +1,4 @@
+#pragma once
 /*
 This file is picked from project testa [https://github.com/TimeExceed/testa.git]
 Copyright (c) 2017, Taoda (tyf00@aliyun.com)
@@ -29,78 +30,50 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "prettyprint.hpp"
-#include <deque>
-#include <cmath>
+#include <optional>
 
-using namespace std;
-#if __cplusplus < 201103L
-using namespace std::tr1;
+#ifdef ENABLE_STD_FORMAT
+#include <format>
+#endif
+#ifdef ENABLE_FMTLIB
+#include <fmt/core.h>
 #endif
 
-
-namespace pp {
-
-FloatPointPrettyPrinter::FloatPointPrettyPrinter(double v, size_t prec)
-:   mValue(v), mPrec(prec)
-{}
-
-void FloatPointPrettyPrinter::prettyPrint(string& out) const
+template<class T>
+#ifdef ENABLE_STD_FORMAT
+struct std::formatter<::std::optional<T>, char>
+#endif
+#ifdef ENABLE_FMTLIB
+struct fmt::formatter<::std::optional<T>, char>
+#endif
 {
-    if (isnan(mValue)) {
-        out.append("NaN");
-        return;
-    }
-
-    if (isinf(mValue)) {
-        if (mValue > 0) {
-            out.push_back('+');
-        } else {
-            out.push_back('-');
-        }
-        out.append("inf");
-        return;
-    }
-
-    double x = mValue;
-    if (x < 0) {
-        x = -x;
-        out.push_back('-');
-    }
-    deque<size_t> digits;
-    if (x < 1) {
-        digits.push_back(0);
-    } else {
-        size_t integral = static_cast<size_t>(x);
-        digits.push_back(integral);
-        x -= integral;
-    }
-    for(size_t i = 0; i < mPrec + 1; ++i) {
-        x *= 10;
-        size_t integral = static_cast<size_t>(x);
-        digits.push_back(integral);
-        x -= integral;
-    }
+    template<class ParseContext>
+    constexpr ParseContext::iterator parse(ParseContext& ctx)
     {
-        size_t carriage = digits.back();
-        digits.pop_back();
-        if (carriage >= 5) {
-            for(size_t n = digits.size() - 1; n > 0; --n) {
-                digits[n] += 1;
-                if (digits[n] < 10) {
-                    break;
-                }
-                digits[n] -= 10;
-            }
+        auto it = ctx.begin();
+        for(; it != ctx.end() && *it != '}'; ++it) {
+        }
+        return it;
+    }
+
+    template<class FmtContext>
+    FmtContext::iterator format(const ::std::optional<T>& s, FmtContext& ctx) const
+    {
+        auto it = ctx.out();
+        if (s) {
+#ifdef ENABLE_STD_FORMAT
+            return ::std::format_to(it, "Just({})", *s);
+#endif
+#ifdef ENABLE_FMTLIB
+            return ::fmt::format_to(it, "Just({})", *s);
+#endif
+        } else {
+#ifdef ENABLE_STD_FORMAT
+            return ::std::format_to(it, "None");
+#endif
+#ifdef ENABLE_FMTLIB
+            return ::fmt::format_to(it, "None");
+#endif
         }
     }
-
-    pp::prettyPrint(out, digits.front());
-    out.push_back('.');
-    for(digits.pop_front(); !digits.empty(); digits.pop_front()) {
-        pp::prettyPrint(out, digits.front());
-    }
-}
-
-} // namespace pp
-
+};

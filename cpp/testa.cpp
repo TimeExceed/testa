@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sstream>
 #include <cstdlib>
 #include <cstdio>
+#include <string_view>
 
 using namespace std;
 #if __cplusplus < 201103L
@@ -71,7 +72,7 @@ void CaseFailIssuer::issue()
     issue(string());
 }
 
-void CaseFailIssuer::issue(const string& msg)
+void CaseFailIssuer::issue(const string_view& msg)
 {
     mIssued = true;
     if (!mTrigger) {
@@ -82,21 +83,15 @@ void CaseFailIssuer::issue(const string& msg)
     if (!msg.empty()) {
         oss << "Message: " << msg << endl;
     }
-    for(int64_t i = 0, sz = mKeyValues.size(); i < sz; ++i) {
+    for(int64_t i = 0, sz = mHints.size(); i < sz; ++i) {
         if (i == 0) {
-            oss << "Values: ";
+            oss << "Hints: ";
         } else {
             oss << "        ";
         }
-        oss << get<0>(mKeyValues[i]) << "=" << get<1>(mKeyValues[i]) << endl;
+        oss << mHints[i] << endl;
     }
     throw std::logic_error(oss.str());
-}
-
-CaseFailIssuer& CaseFailIssuer::append(const string& key, const string& value)
-{
-    mKeyValues.push_back(KV(key, value));
-    return *this;
 }
 
 } // namespace testa

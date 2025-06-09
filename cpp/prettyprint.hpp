@@ -30,48 +30,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef TABLESTORE_UTIL_PRETTYPRINT_HPP
-#define TABLESTORE_UTIL_PRETTYPRINT_HPP
-
-#include "metaprogramming.hpp"
-#include <string>
-
-namespace pp {
-
-namespace impl {
-
-template<class T, class E=void>
-struct PrettyPrinter;
-
-} // namespace impl
-
-template<class T>
-void prettyPrint(std::string& out, const T& x)
-{
-    impl::PrettyPrinter<typename mp::RemoveCvref<T>::Type> p;
-    p(out, x);
-}
-
-template<class T>
-std::string prettyPrint(const T& x)
-{
-    std::string res;
-    prettyPrint<T>(res, x);
-    return res;
-}
-
-struct FloatPointPrettyPrinter
-{
-    explicit FloatPointPrettyPrinter(double v, size_t prec = 4);
-    void prettyPrint(std::string&) const;
-
-private:
-    double mValue;
-    size_t mPrec;
-};
-
-} // namespace pp
-
-#include "prettyprint.ipp"
-
-#endif
+#include "pp_tuple.hpp"
+#include "pp_optional.hpp"
+#include "pp_refwrap.hpp"

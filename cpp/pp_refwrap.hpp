@@ -1,3 +1,4 @@
+#pragma once
 /*
 This file is picked from project testa [https://github.com/TimeExceed/testa.git]
 Copyright (c) 2017, Taoda (tyf00@aliyun.com)
@@ -29,43 +30,40 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef TESTA_HPP
-#define TESTA_HPP
+#include <functional>
 
-#include "testa.ipp"
+#ifdef ENABLE_STD_FORMAT
+#include <format>
+#endif
+#ifdef ENABLE_FMTLIB
+#include <fmt/core.h>
+#endif
 
-#define TESTA_PINGPONG_A(...) \
-    TESTA_PINGPONG_OP(B __VA_OPT__(,) __VA_ARGS__)
-#define TESTA_PINGPONG_B(...) \
-    TESTA_PINGPONG_OP(A __VA_OPT__(,) __VA_ARGS__)
-#define TESTA_PINGPONG_OP(next, ...) \
-    append(__VA_ARGS__). TESTA_PINGPONG_##next
+template<class T>
+#ifdef ENABLE_STD_FORMAT
+struct std::formatter<::std::reference_wrapper<T>, char>
+#endif
+#ifdef ENABLE_FMTLIB
+struct fmt::formatter<::std::reference_wrapper<T>, char>
+#endif
+{
+    template<class ParseContext>
+    constexpr ParseContext::iterator parse(ParseContext& ctx)
+    {
+        auto it = ctx.begin();
+        for(; it != ctx.end() && *it != '}'; ++it) {
+        }
+        return it;
+    }
 
-#define TESTA_ASSERT(cond) \
-    if (cond) {\
-        ::testa::CaseFailIssuer(true, #cond, __FILE__, __LINE__).issue(); \
-    } else ::testa::CaseFailIssuer(false, #cond, __FILE__, __LINE__). TESTA_PINGPONG_A
-
-#define TESTA_DEF_EQ_WITH_TB(caseName, caseTb, trialFn, oracleFn) \
-    testa::EqCase cs##caseName(#caseName, (caseTb), (trialFn), (oracleFn))
-
-#define TESTA_DEF_EQ_1(caseName, trialFn, oracleFn, in0)                 \
-    testa::EqCase cs##caseName(#caseName, (trialFn), (oracleFn), (in0))
-
-#define TESTA_DEF_EQ_2(caseName, trialFn, oracleFn, in0, in1)        \
-    testa::EqCase cs##caseName(#caseName, (trialFn), (oracleFn), (in0), (in1))
-
-#define TESTA_DEF_EQ_3(caseName, trialFn, oracleFn, in0, in1, in2)       \
-    testa::EqCase cs##caseName(#caseName, (trialFn), (oracleFn), \
-        (in0), (in1), (in2))
-
-#define TESTA_DEF_VERIFY_WITH_TB(caseName, caseTb, caseVerfier, trialFn) \
-    testa::VerifyCase cs##caseName(#caseName, (caseTb), (caseVerfier), (trialFn))
-
-#define TESTA_DEF_JUNIT_LIKE2(caseName, tbVerifier) \
-    testa::VerifyCase cs##caseName(#caseName, tbVerifier)
-
-#define TESTA_DEF_JUNIT_LIKE1(caseName) \
-    TESTA_DEF_JUNIT_LIKE2(caseName, caseName)
-
-#endif /* TESTA_HPP */
+    template<class FmtContext>
+    FmtContext::iterator format(const ::std::reference_wrapper<T>& s, FmtContext& ctx) const
+    {
+#ifdef ENABLE_STD_FORMAT
+        return ::std::format_to(ctx.out(), "&{}", s.get());
+#endif
+#ifdef ENABLE_FMTLIB
+        return ::fmt::format_to(ctx.out(), "&{}", s.get());
+#endif
+    }
+};

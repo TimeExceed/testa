@@ -1,0 +1,6 @@
+HeaderInsertion: Never
+InlayHints:
+    ParameterNames: No
+    DeducedTypes: No
+    BlockEnd: Yes
+    Designators: No

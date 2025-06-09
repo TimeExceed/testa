@@ -40,7 +40,7 @@ import shlex
 import re
 from functools import partial
 from itertools import groupby
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import argparse
 
 def countCpu():
@@ -119,20 +119,20 @@ def work(opts, qin, qout):
                 kws['cwd'] = cs['cwd']
                 if opts.timeout and not cs.get('suppress_timeout', False):
                     kws['timeout'] = opts.timeout
-                cs['start'] = datetime.utcnow()
+                cs['start'] = datetime.now(UTC)
                 try:
                     subprocess.run(args, **kws)
-                    cs['stop'] = datetime.utcnow()
+                    cs['stop'] = datetime.now(UTC)
                     qout.put([kOk, cs['name'], cs])
                 except subprocess.CalledProcessError:
                     stderr.write(bytes(str(args), 'UTF-8'))
                     stderr.write(bytes('\n', 'UTF-8'))
                     stderr.write(bytes(str(kws), 'UTF-8'))
                     stderr.write(bytes('\n', 'UTF-8'))
-                    cs['stop'] = datetime.utcnow()
+                    cs['stop'] = datetime.now(UTC)
                     qout.put([kError, cs['name'], cs])
                 except subprocess.TimeoutExpired:
-                    cs['stop'] = datetime.utcnow()
+                    cs['stop'] = datetime.now(UTC)
                     qout.put([kTimeout, cs['name'], cs])
     except KeyboardInterrupt:
         qout.put([kCancel, 'Ctrl-C'])
