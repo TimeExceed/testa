@@ -302,5 +302,6 @@ if __name__ == '__main__':
             report(opts.report, passed + failed)
             print()
             print('save a report to %s' % (opts.report, ))
+        exit(1 if failed else 0)
     finally:
         stopWorkers(reqQ, workers)
