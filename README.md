@@ -529,7 +529,6 @@ Only test cases related to `:is` are executed.
 
 Please make sure the following requisitions are ready.
 * python3. necessary to run scons and runtests.py
-* scons 2.1+.
 * for clojure:
   - (optional) jdk6+. Testa is developed under jdk7, but we think jdk6 is ok too.
   - wget
@@ -537,7 +536,8 @@ Please make sure the following requisitions are ready.
 * for lua:
   - lua-5.3. Testa is developed under lua-5.3, but we think lua-5.2 is ok too.
 * for C++:
-  - Both C++98-TR1 (a.k.a. C++03) and C++11 are supported.
+  - Both C++-17 and [fmtlib](https://fmt.dev/) is required if `ENABLE_FMTLIB` is on.
+  - Otherwise, C++-20 is required and `ENABLE_STD_FORMAT` must be on.
 * for Python:
   - Only python3 is is supported.
 

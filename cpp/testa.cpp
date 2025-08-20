@@ -1,98 +1,67 @@
-/*
-This file is picked from project testa [https://github.com/TimeExceed/testa.git]
-Copyright (c) 2017, Taoda (tyf00@aliyun.com)
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice, this
-  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
-
-* Neither the name of the {organization} nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-#include "testa.ipp"
+#include "testa.hpp"
+#include <iterator>
 #include <stdexcept>
-#include <sstream>
+#include <string_view>
 #include <cstdlib>
 #include <cstdio>
-#include <string_view>
 
 using namespace std;
-#if __cplusplus < 201103L
-using namespace std::tr1;
+
+#ifdef ENABLE_STD_FORMAT
+using std::format_to;
+#endif
+#ifdef ENABLE_FMTLIB
+using fmt::format_to;
 #endif
 
-namespace testa {
+namespace testa::_impl {
 
-shared_ptr<CaseMap> getCaseMap()
+shared_ptr<CaseMap> get_case_map()
 {
     static shared_ptr<CaseMap> result(new CaseMap());
     return result;
 }
 
-CaseFailIssuer::CaseFailIssuer(bool disable, const char* cond, const char* fn, int line)
-  : mTrigger(!disable),
-    mCondition(cond),
-    mFilename(fn),
-    mLine(line),
-    mIssued(false),
-    TESTA_PINGPONG_A(*this),
-    TESTA_PINGPONG_B(*this)
+CaseFailIssuer::CaseFailIssuer(const char* cond, const char* fn, int line)
+:   _condition(cond),
+    _filename(fn),
+    _line(line),
+    _issued(false)
 {}
 
 CaseFailIssuer::~CaseFailIssuer()
 {
-    if (!mIssued) {
-        fprintf(stderr, "TESTA_ASSERT @ %s:%d does not invoke issue()\n", mFilename.c_str(), mLine);
+    if (!_issued) {
+        fprintf(stderr, "TESTA_ASSERT @ %s:%d does not invoke issue()\n",
+            _filename.data(), _line);
         abort();
     }
 }
 
-void CaseFailIssuer::issue()
+void CaseFailIssuer::issue() &&
 {
-    issue(string());
+    std::move(*this).issue(string());
 }
 
-void CaseFailIssuer::issue(const string_view& msg)
+void CaseFailIssuer::issue(const string_view& msg) &&
 {
-    mIssued = true;
-    if (!mTrigger) {
-        return;
-    }
-    ostringstream oss;
-    oss << "Assertion @ " << mFilename << ":" << mLine << " fail: " << mCondition << endl;
+    _issued = true;
+    string full_msg;
+    auto it = std::back_inserter(full_msg);
+    it = format_to(it, "Assertion @ {}:{} fail: {}\n",
+        _filename, _line, _condition);
     if (!msg.empty()) {
-        oss << "Message: " << msg << endl;
+        it = format_to(it, "Message: {}\n", msg);
     }
-    for(int64_t i = 0, sz = mHints.size(); i < sz; ++i) {
-        if (i == 0) {
-            oss << "Hints: ";
-        } else {
-            oss << "        ";
-        }
-        oss << mHints[i] << endl;
+    auto h_it = _hints.begin();
+    if (h_it != _hints.end()) {
+        it = format_to(it, "Hints: {}\n", *h_it);
+        ++h_it;
     }
-    throw std::logic_error(oss.str());
+    for (; h_it != _hints.end(); ++h_it) {
+        it = format_to(it, "       {}\n", *h_it);
+    }
+    throw std::logic_error(full_msg);
 }
 
-} // namespace testa
-
+}

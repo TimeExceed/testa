@@ -36,7 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <format>
 #endif
 #ifdef ENABLE_FMTLIB
-#include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/std.h>
 #endif
 
 #ifdef ENABLE_STD_FORMAT
@@ -100,59 +101,3 @@ public:
 #endif
 #endif
 
-#ifdef ENABLE_FMTLIB
-template<class... Args>
-struct fmt::formatter<::std::tuple<Args...>, char>
-{
-private:
-    template<class T, ::std::size_t idx, bool end>
-    struct _TuplePrettyPrint
-    {
-        template<class FmtIter>
-        FmtIter operator()(FmtIter it, const T& xs) const
-        {
-            if (idx == 0) {
-                it = ::fmt::format_to(it, "{}", std::get<idx>(xs));
-            } else {
-                it = ::fmt::format_to(it, ",{}", std::get<idx>(xs));
-            }
-            _TuplePrettyPrint<T, idx + 1, idx + 1 == std::tuple_size_v<T>> p;
-            return p(it, xs);
-        }
-    };
-
-    template<class T, ::std::size_t idx>
-    struct _TuplePrettyPrint<T, idx, true>
-    {
-        template<class FmtIter>
-        FmtIter operator()(FmtIter it, const T& xs) const
-        {
-            return it;
-        }
-    };
-
-public:
-    template<class ParseContext>
-    constexpr ParseContext::iterator parse(ParseContext& ctx)
-    {
-        auto it = ctx.begin();
-        for(; it != ctx.end() && *it != '}'; ++it) {
-        }
-        return it;
-    }
-
-    template<class FmtContext>
-    FmtContext::iterator format(const ::std::tuple<Args...>& s, FmtContext& ctx) const
-    {
-        auto it = ctx.out();
-        it = ::fmt::format_to(it, "(");
-        constexpr auto n = ::std::tuple_size_v<::std::tuple<Args...>>;
-        if (0 < n) {
-            _TuplePrettyPrint<::std::tuple<Args...>, 0, n == 0> p;
-            it = p(it, s);
-        }
-        it = ::fmt::format_to(it, ")");
-        return it;
-    }
-};
-#endif
