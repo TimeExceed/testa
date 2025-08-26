@@ -29,19 +29,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import os
-import os.path as op
-from queue import Queue
-import threading
-import json
-import subprocess as subprocess
-import shlex
-import re
-from functools import partial
-from itertools import groupby
-from datetime import datetime, timedelta, UTC
 import argparse
+import json
+import os
+import re
+import subprocess as sp
+import shlex
+import sys
+import threading
+from datetime import datetime, timedelta, UTC
+from math import sqrt, fabs
+from pathlib import Path
+from queue import Queue
 
 def countCpu():
     try:
@@ -69,6 +68,8 @@ def parseArgs():
     parser.add_argument('--report', nargs='?',
                         help='report as a json file')
     args = parser.parse_args()
+    args.dir = Path(args.dir).absolute()
+    args.stats = readStats(args)
     return args
 
 def readLangCfg(fn):
@@ -121,17 +122,17 @@ def work(opts, qin, qout):
                     kws['timeout'] = opts.timeout
                 cs['start'] = datetime.now(UTC)
                 try:
-                    subprocess.run(args, **kws)
+                    sp.run(args, **kws)
                     cs['stop'] = datetime.now(UTC)
                     qout.put([kOk, cs['name'], cs])
-                except subprocess.CalledProcessError:
+                except sp.CalledProcessError:
                     stderr.write(bytes(str(args), 'UTF-8'))
                     stderr.write(bytes('\n', 'UTF-8'))
                     stderr.write(bytes(str(kws), 'UTF-8'))
                     stderr.write(bytes('\n', 'UTF-8'))
                     cs['stop'] = datetime.now(UTC)
                     qout.put([kError, cs['name'], cs])
-                except subprocess.TimeoutExpired:
+                except sp.TimeoutExpired:
                     cs['stop'] = datetime.now(UTC)
                     qout.put([kTimeout, cs['name'], cs])
     except KeyboardInterrupt:
@@ -165,23 +166,22 @@ def findMatchLanguage(exe, langs):
 
 def getExecutableArgs(exe, langs):
     lang = findMatchLanguage(exe, langs)
-    exe = op.abspath(exe)
+    exe = Path(exe).absolute()
     return lang['execute'] % {'prog': exe, 'arg': '--show-cases'}
 
 def collectCases(opts, langs, reqQ, resQ):
     exes = []
     for exe in opts.executables:
         exeArgs = getExecutableArgs(exe, langs)
-        progDir = op.abspath(op.dirname(exe))
-        testDir = op.abspath(op.join(opts.dir, exe))
-        if not op.exists(testDir):
-            os.makedirs(testDir)
+        progDir = Path(exe).parent
+        testDir = (opts.dir / exe).absolute()
+        testDir.mkdir(parents=True, exist_ok=True)
         exes.append({
             'name': exe,
             'execute': exeArgs,
             'cwd': progDir,
-            'stdout': op.join(testDir, 'cases.out'),
-            'stderr': op.join(testDir, 'cases.err'),
+            'stdout': testDir / 'cases.out',
+            'stderr': testDir / 'cases.err',
             'suppress_timeout': True})
     for e in exes:
         reqQ.put(e)
@@ -195,13 +195,15 @@ def collectCases(opts, langs, reqQ, resQ):
             cs = json.load(f)
         lang = findMatchLanguage(exe, langs)
         for c in cs:
+            name = c['name']
             x = {
-                'name': '%s/%s' % (exe, c['name']),
+                'name': f'{exe}/{name}',
                 'broken': c.get('broken', False),
-                'execute': lang['execute'] % {'prog': op.abspath(exe), 'arg': c['name']},
+                'execute': lang['execute'] % \
+                    {'prog': Path(exe).absolute(), 'arg': name},
                 'cwd': res[2]['cwd'],
-                'stdout': op.join(opts.dir, exe, '%s.out' % c['name']),
-                'stderr': op.join(opts.dir, exe, '%s.err' % c['name']),
+                'stdout': opts.dir / exe / f'{name}.out',
+                'stderr': opts.dir / exe / f'{name}.err',
             }
             if x['broken']:
                 x['broken-reason'] = c['broken_reason']
@@ -231,7 +233,9 @@ def filterCases(opts, cases):
     cases = [x for x in cases if re.search(opts.include, x['name'])]
     return cases
 
-def dispatchCases(cases, reqQ):
+def dispatchCases(opts, cases, reqQ):
+    exp_rt = expectedRuntime(opts)
+    cases.sort(key=lambda c: exp_rt.get(c['name'], 0.0), reverse=True)
     for cs in cases:
         reqQ.put(cs)
 
@@ -242,6 +246,7 @@ def collectResults(opts, cases, resQ):
     while len(passed) + len(failed) < caseNum:
         res = resQ.get()
         r = res[2].copy()
+        additional_msg = ''
         if res[0] == kSkip:
             r['result'] = 'SKIP'
             r['duration'] = timedelta()
@@ -255,6 +260,22 @@ def collectResults(opts, cases, resQ):
                 r['result'] = 'PASS'
                 passed.append(r)
                 result = colored('pass', 'green')
+                avg_dev = calcAvgDev(opts, r['name'])
+                if avg_dev is not None:
+                    avg, dev = avg_dev
+                    d = r['duration'].total_seconds()
+                    sign = '+' if d >= avg else '-'
+                    bias = fabs(d - avg) / dev
+                    additional_msg = f'{sign}{bias:.2f} stddev, average: {avg:.2f}, stddev: {dev:.2f}'
+                    if d > 1 or avg > 1:
+                        hint = None
+                        if d < avg - 3 * dev:
+                            hint = colored(' too fast', 'red')
+                        elif d > avg + 3 * dev:
+                            hint = colored(' too slow', 'red')
+                        if hint is not None:
+                            additional_msg = f'{additional_msg}{hint}'
+                    additional_msg = f'({additional_msg})'
             elif res[0] == kError:
                 r['result'] = 'FAILED'
                 failed.append(r)
@@ -265,11 +286,12 @@ def collectResults(opts, cases, resQ):
                 result = colored('kill', 'red')
             else:
                 error('cancelled')
-        print('%d/%d %s: %s costs %.6f secs' % (
+        print('%d/%d %s: %s costs %.3f secs%s' % (
             len(passed) + len(failed), caseNum,
             result,
             r['name'],
-            r['duration'].total_seconds()))
+            r['duration'].total_seconds(),
+            additional_msg))
     return passed, failed
 
 def report(filename, results):
@@ -282,6 +304,44 @@ def report(filename, results):
     with open(filename, 'w') as fp:
         json.dump(json_res, fp, indent='  ', sort_keys=True)
 
+def calcAvgDev(opts, case_name):
+    durs = opts.stats.get(case_name)
+    if durs is None:
+        return None
+    if len(durs) <= 1:
+        return None
+    avg = sum(durs) / float(len(durs))
+    dev = sqrt(sum((x - avg) ** 2 for x in durs) / float(len(durs) - 1))
+    return (avg, dev)
+
+def readStats(opts):
+    stats_file = opts.dir / 'stats.json'
+    if not stats_file.exists():
+        return {}
+    with open(stats_file) as fp:
+        return json.load(fp)
+
+def expectedRuntime(opts):
+    res = {}
+    stats = opts.stats
+    for k, v in stats.items():
+        if len(v) > 0:
+            res[k] = sum(v) / float(len(v))
+    return res
+
+def writeOutStats(opts, passed, failed):
+    stats = opts.stats.copy()
+    for c in passed:
+        if c['result'] == 'SKIP':
+            continue
+        case_durs = stats.get(c['name'], [])
+        case_durs.append(c['duration'].total_seconds())
+        if len(case_durs) > 10:
+            del case_durs[0 : len(case_durs) - 10]
+        stats[c['name']] = case_durs
+    with open(opts.dir / 'stats.json', 'w') as fp:
+        json.dump(stats, fp, sort_keys=True)
+
 if __name__ == '__main__':
     opts = parseArgs()
     langs = readLangCfg(opts.lang)
@@ -290,8 +350,9 @@ if __name__ == '__main__':
     try:
         cases = collectCases(opts, langs, reqQ, resQ)
         cases = filterCases(opts, cases)
-        dispatchCases(cases, reqQ)
+        dispatchCases(opts, cases, reqQ)
         passed, failed = collectResults(opts, cases, resQ)
+        writeOutStats(opts, passed, failed)
         print()
         print('%d failed' % len(failed))
         for x in failed:
