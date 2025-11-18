@@ -1,4 +1,6 @@
 .sconsign.dblite
-/build
-/tres
-/test_results
+/build/
+/tres/
+/test_results/
+/.vscode/
+/.devcontainer/

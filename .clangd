@@ -1,6 +1,9 @@
-HeaderInsertion: Never
 InlayHints:
     ParameterNames: No
     DeducedTypes: No
     BlockEnd: Yes
     Designators: No
+Diagnostics:
+    Suppress: '*'
+CompileFlags:
+    Remove: [-fconcepts-diagnostics-depth=*, -Wno-maybe-uninitialized]
